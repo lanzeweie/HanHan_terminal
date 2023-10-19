@@ -46,7 +46,7 @@
 │   └── zhou.png          --图标   
 ├── log/                  --日志    
 │   └── last.log          --当前日志，会自动打包上一次的日志     
-├── app/                  --日志          
+├── app/                  --一些可用上的辅助程序         
 │   └── Custom_command_editor.py          --快捷API链接编辑器      
 ├── requirements.txt      --所需库      
 ├── REMDAD.md     
