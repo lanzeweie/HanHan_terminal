@@ -1,4 +1,5 @@
 /log/*
+!/log/
 /data/one
 /bulid
 DABAO.md
