@@ -1,0 +1,9 @@
+【2023-10-22 21:52:38】
+[控制台]: 设备 192.168.137.36 发起命令hh
+JSON 数据: {'name': 'han han', 'command': 'cmd.exe /c echo 你好'}
+【2023-10-22 21:52:46】
+[控制台]: 设备 192.168.137.36 发起命令hh
+JSON 数据: {'name': 'han han', 'command': 'cmd.exe /c echo 你好'}
+【2023-10-22 21:52:47】
+[控制台]: 设备 192.168.137.36 发起命令hh
+JSON 数据: {'name': 'han han', 'command': 'cmd.exe /c echo 你好'}

@@ -104,7 +104,7 @@ class App(tk.Frame):
 
             if "datacommand" in item:
                 title += " [自定义命令]"
-            if "url" in item:
+            if "apiUrlCommand" in item:
                 title += " [API链接]"
             self.menu_list.insert(tk.END, title)
 
@@ -119,7 +119,7 @@ class App(tk.Frame):
         if selection:
             index = selection[0]
             item = self.data[index]
-            if "datacommand" in item or ("url" in item and item["url"] == "yes"):
+            if "datacommand" in item or ("apiUrlCommand" in item and item["apiUrlCommand"] == "yes"):
                 self.modify_command_button.config(state="normal")
                 self.delete_command_button.config(state="normal")
             else:
@@ -143,7 +143,7 @@ class App(tk.Frame):
                 if new_command is not None:
                     item["datacommand"] = new_command
                     self.save_data()
-            elif "url" in item and item["url"] == "yes":
+            elif "apiUrlCommand" in item and item["apiUrlCommand"] == "yes":
                 dialog_title = "修改API URL"
                 dialog_text = "请输入新的API URL"
                 dialog = Dialog(self.master, dialog_title, dialog_text, item["apiUrl"])
