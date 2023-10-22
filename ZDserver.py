@@ -227,8 +227,6 @@ class flask_api_web():
         print(f"【{current_time}】\n[控制台]: 设备 {client_ip} 发起命令hh")
         print("JSON 数据:", json_data)
 
-        # 将日志写入文件
-        log_file_name = "log.txt"
         nrong = f"【{current_time}】\n[控制台]: 设备 {client_ip} 发起命令hh\nJSON 数据: {json_data}\n"
         with open(log_file_name, "a", encoding="utf-8") as f:
             f.write(nrong)
@@ -260,7 +258,11 @@ class flask_api_web():
 class Basics():
     def run_socket(host, port):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind((host, port))
+        try:
+            server_socket.bind((host, port))
+        except:
+            messagebox.showinfo("控制终端核心", f"Flask 服务 无法启动 \n未开放或被占用")  
+            os._exit(0)
         server_socket.listen(20)
         try:
             while True:
@@ -396,7 +398,7 @@ if __name__ == '__main__':
         pystray.MenuItem("打开目录", lambda item: Basics.open_current_directory()),   
         pystray.MenuItem("退出", lambda item: Basics.windows_exit()),  
     ) 
-    serve_windows_mix_icon = pystray.Icon("name", image, f"终端服务\n已激活服务，端口：{port}/{port+1}", menu)  
+    serve_windows_mix_icon = pystray.Icon("name", image, f"终端服务\n地址：{get_ipv4_bianhua()}\n已激活服务，端口：{get_ipv4_bianhua()}/{port+1}", menu)  
     serve_windows_mix_icon_duoxianc = threading.Thread(target=Basics.windowsn_xiaocx)
     serve_windows_mix_icon_duoxianc.daemon = True
     serve_windows_mix_icon_duoxianc.start()
@@ -404,11 +406,14 @@ if __name__ == '__main__':
     socket_thread = threading.Thread(target=Basics.run_socket, args=(host, port))
     socket_thread.daemon = True
     socket_thread.start()
-    print(f"\n涵涵的控制终端核心 已成功启动 当前地址：{host}:{port}/{port+1}")
+    
     #messagebox.showinfo("涵涵的控制终端核心", f"\n涵涵的控制终端核心 已成功启动 当前地址：{host}:{port}/{port+1}")  
     try:
+        print(f"\n涵涵的控制终端核心 已成功启动 当前地址：{get_ipv4_bianhua()}:{port}/{port+1}")
         serve(app, host=host, port=port + 1)
     except:
-        print(f"Flask 服务 无法启动 地址：{host}:{port + 1} 未开放或被占用")
-        messagebox.showinfo("涵涵的控制终端核心", f"Flask 服务 无法启动 地址：{host}:{port + 1} 未开放或被占用")  
+        print(f"Flask 服务 无法启动 地址：{get_ipv4_bianhua()}:{port + 1} 未开放或被占用")
+        messagebox.showinfo("涵涵的控制终端核心", f"Flask 服务 无法启动 地址：{get_ipv4_bianhua()}:{port + 1} 未开放或被占用")  
         os._exit(0)
+
+    
