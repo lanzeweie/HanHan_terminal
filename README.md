@@ -50,8 +50,9 @@
 │   └── Custom_command_editor.py          --快捷API链接编辑器      
 ├── requirements.txt      --所需库      
 ├── REMDAD.md     
-├── bendi.py              --API对应的本地命令      
+├── Localcommand.py       --API对应的本地命令-由主程序调用    
 ├── ZDserver.py           --服务端主程序          
+├── WinTaskbar.py         --在Windows的小任务栏-由主程序调用    
 ├── .gitignore   
 
 

@@ -1,30 +1,42 @@
 [
   {
-    "title": "点我修改名字",
+    "title": "涵涵",
     "//1": "以上是标题,可以在任务栏中修改",
-    "apiUrl": "http://192.168.137.197:5202/hello",
+    "apiUrl": "http://172.27.94.130:5202/hello",
     "//2": "以上是访问的地址",
     "guding": "n",
     "//3": "y 就不会改变apiUrl的地址，n就会格式化为本机地址"
   },
   {
     "title": "锁屏",
-    "apiUrl": "http://192.168.137.197:5202/suoping",
+    "apiUrl": "http://172.27.94.130:5202/suoping",
     "guding": "n"
   },
   {
     "title": "关机",
-    "apiUrl": "http://192.168.137.197:5202/stop",
+    "apiUrl": "http://172.27.94.130:5202/stop",
     "guding": "n"
   },
   {
     "title": "蓝屏",
-    "apiUrl": "http://192.168.137.197:5202/lanping",
-    "guding": "y"
+    "apiUrl": "http://172.27.94.130:5202/lanping",
+    "guding": "n"
   },
   {
-    "title": "你好呀",
-    "apiUrl": "http://192.168.137.197:5202/command",
+    "title": "立即关机",
+    "apiUrl": "http://172.27.94.130:5202/command",
+    "guding": "n",
+    "datacommand": "shutdown /s /t 0\n"
+  },
+  {
+    "title": "随机一句诗歌词",
+    "apiUrl": "https://v1.hitokoto.cn/?c=i&encode=text",
+    "guding": "y",
+    "apiUrlCommand": "yes"
+  },
+  {
+    "title": "cmd说你好",
+    "apiUrl": "http://172.27.94.130:5202/command",
     "guding": "n",
     "datacommand": "cmd.exe /c echo 你好"
   }

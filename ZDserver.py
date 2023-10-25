@@ -2,14 +2,12 @@ from waitress import serve
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import datetime,socket,threading,json,sys,os,subprocess,winreg
-from bendi import windows_command
+from Localcommand import windows_command
 import time  
 import zipfile
 # 任务栏小图标
-import pystray  
-from PIL import Image  
 from tkinter import messagebox  
-import tkinter as tk
+from WinTaskbar import Taskbar
 
 #初始化
 #判断环境是exe还是py
@@ -29,27 +27,27 @@ else:
         f.write("")
 log_file_name = (f"{server_lujin}\log\{log_file}")
 
-def file_json_geshihua(port):
+def file_json_geshihua(ipv4,port):
     #格式化dataj json数据，设置为当机地址
-    ipv4_ip = get_ipv4_address()
+    #----------历史屎坑--------如果去除它则无法运行
+    get_ipv4_address()
+    #----------历史屎坑--------如果去除它则无法运行
     with open(f'{server_lujin}\data\orderlist.json', 'r', encoding='utf-8') as file:
         data = json.load(file)
-
     for item in data:
         if item['guding'] == 'n':
             url_parts = item['apiUrl'].split('//')
             if len(url_parts) > 1:
                 address = url_parts[1].split('/')[0]
-                formatted_address = address.replace(address, f'{ipv4_ip}:{port+1}')
+                formatted_address = address.replace(address, f'{ipv4}:{port+1}')
                 item['apiUrl'] = item['apiUrl'].replace(address, formatted_address)
 
     with open(f'{server_lujin}\data\orderlist.json', 'w', encoding='utf-8') as file:
         json.dump(data, file, indent=2, ensure_ascii=False)
-    print("已读取配置文件")
+    print("读取了配置文件")
 
-def check_files_and_dirs():  
+def check_files_and_dirs():
     files_and_dirs = [f"{server_lujin}/data"]
-      
     for item in files_and_dirs:  
         if os.path.exists(item):  
             pass  
@@ -59,6 +57,8 @@ def check_files_and_dirs():
             os._exit()
     print("\n环境已检查：正常")
 
+
+#--------------------------------屎坑 删除则无法运行 不知道作用-----------------------
 def get_ipv4_address():  
     ip_address = None  
     output = subprocess.check_output('ipconfig', shell=True).decode('gbk')  
@@ -93,8 +93,9 @@ def get_any_ip_address(output, prefix=None):
             if not prefix or ip_address.startswith(prefix):  
                 return ip_address  
     return None
+#--------------------------------屎坑 删除则无法运行 不知道作用-----------------------
 
-def get_ipv4_bianhua():
+def get_ipv4_now():
     ip_address = None
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -105,15 +106,17 @@ def get_ipv4_bianhua():
         pass
     return ip_address
 
-def check_ipv4_bianhua(port):
+def check_ipv4_Dynamic_state(port):
     previous_address = None
     while True:
-        current_address = get_ipv4_bianhua()
+        current_address = get_ipv4_now()
         if current_address and current_address != previous_address:
             print("IPv4 地址发生变化：", current_address)
             previous_address = current_address
-            file_json_geshihua(port)
-
+            #更改json地址
+            file_json_geshihua(current_address,port)
+            #更改Windows小任务栏的地址
+            Taskbar_start.icon_dongtai(current_address,port)
         time.sleep(20)
 
 app = Flask(__name__)
@@ -201,22 +204,6 @@ class flask_api_web():
         }
         return jsonify(response)
 
-    @app.route('/lanping', methods=['GET'])
-    def run_lanping():
-        client_ip = request.remote_addr  # 获取客户端的 IP 地址
-        current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        nrong = (f"【{current_time}】\n[控制台]: 设备 {client_ip} 发起蓝屏命令")
-        print(nrong)
-        with open(log_file_name, "a", encoding="utf-8") as f:
-            f.write(nrong)
-        windows_command.suoping()
-        response = {
-            "title": "命令返回状态",
-            "execution_time": current_time,
-            "success": True
-        }
-        return jsonify(response)
-    
     @app.route('/command', methods=['POST'])
     def run_commandhh():
         client_ip = request.remote_addr  # 获取客户端的 IP 地址
@@ -274,90 +261,11 @@ class Basics():
             pass
         finally:
             server_socket.close()
-
-    def windowsn_xiaocx():
-        serve_windows_mix_icon.run()
-    def windows_exit():
-        serve_windows_mix_icon.stop()
-        os._exit(0)
-    def open_current_directory():
-        current_directory = server_lujin
-        os.startfile(current_directory)
     #新增
     def add_to_startup(app_name, app_path):
         reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
         winreg.SetValueEx(reg_key, app_name, 0, winreg.REG_SZ, app_path)
         winreg.CloseKey(reg_key)
-    #删除
-    def remove_from_startup(app_name):
-        reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
-        try:
-            winreg.DeleteValue(reg_key, app_name)
-            print("已删除开机自启")
-        except FileNotFoundError:
-            print(f"启动项中不存在应用程序: {app_name}")
-        winreg.CloseKey(reg_key)
-    #查询
-    def check_startup(app_name):
-        reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_READ)
-        try:
-            value, _ = winreg.QueryValueEx(reg_key, app_name)
-            print(f"应用程序 {app_name} 已添加到启动项中")
-            return "surr"
-        except FileNotFoundError:
-            print(f"应用程序 {app_name} 未添加到启动项中")
-        winreg.CloseKey(reg_key)
-        return "null"
-    #开启开启自启或关闭
-    def startup_shifouqidong(app_name, app_path):
-        if Basics.check_startup(app_name) == "surr":
-            Basics.remove_from_startup(app_name)
-        elif Basics.check_startup(app_name) == "null":
-            Basics.add_to_startup(app_name, app_path)
-        os._exit(0)
-    #设备名 通过 orderlist 的第一个元素的 title 获得
-    def shebei_name():
-        with open(f'{server_lujin}\data\orderlist.json', 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        title = data[0]['title']
-        return title
-    #修改设备名
-    def shebei_name_xiugai():
-        def get_input():
-            user_input = entry.get()
-            if user_input.strip() == "":
-                messagebox.showinfo("涵涵的控制终端", "不能输入空值")
-            else:
-                with open(f'{server_lujin}/data/orderlist.json', 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                data[0]['title'] = f"{user_input}"
-                with open(f'{server_lujin}/data/orderlist.json', 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-                messagebox.showinfo("涵涵的控制终端", "设备名已修改成功！")
-                window.destroy()
-                messagebox.showinfo("涵涵的控制终端", "需要手动重新启动")
-                os._exit(0)
-
-        window = tk.Tk()
-        window.title("涵涵的控制终端")
-        window.geometry("400x300")  # 设置窗口大小为400x300像素
-        label = tk.Label(window, text="请输入新的设备名：")
-        label.pack()
-        entry = tk.Entry(window)
-        entry.pack()
-        button = tk.Button(window, text="确定", command=get_input)
-        button.pack()
-        window.mainloop()
-
-    def zdyml_menu():
-        if not os.path.exists(f"{server_lujin}/Custom_command_editor.exe"):
-            if not os.path.exists(f"{server_lujin}/app/Custom_command_editor.exe"):
-                messagebox.showinfo("终端命令编辑器", "应用程序不存在，请勿删除自带文件")
-                return "not"
-            else:
-                Custom_command_editor_start = subprocess.Popen(f'{server_lujin}/app/Custom_command_editor.exe', shell=True)
-        else:
-            Custom_command_editor_start = subprocess.Popen(f'{server_lujin}/Custom_command_editor.exe', shell=True)
 
 if __name__ == '__main__':
     print("------------------------------\n")
@@ -370,50 +278,44 @@ if __name__ == '__main__':
     check_files_and_dirs()
 
     #格式化文件，并实时检测ip地址是否变化，变化则根据新地址格式化文件
-    check_ipv4_bianhua_duoxiancheng = threading.Thread(target=check_ipv4_bianhua, args=(port,))
-    check_ipv4_bianhua_duoxiancheng.daemon = True
-    check_ipv4_bianhua_duoxiancheng.start()
+    #-----------------------实时检测地址是否变化-----------------------
+    check_ipv4_Dynamic_state_duoxiancheng = threading.Thread(target=check_ipv4_Dynamic_state, args=(port,))
+    check_ipv4_Dynamic_state_duoxiancheng.daemon = True
+    check_ipv4_Dynamic_state_duoxiancheng.start()
+    #-----------------------实时检测地址是否变化-----------------------
     
 
     app_name = "涵的控制终端"
-    #是否第一次启动 第一次启动自行开启开机启动
+    #是否第一次启动 设置第一次启动自行开启开机启动
     if os.path.exists(f"{server_lujin}/data/one"):
         pass
     else:
         with open(f"{server_lujin}/data/one", "w") as file:
             pass
-        Basics.add_to_startup(app_name, f"{server_lujin}\{app_file}")
+        Taskbar.command_bootup_menu_add_to_startup(app_name, f"{server_lujin}\{app_file}")
     print(f"{server_lujin}\{app_file}")
-    startup_wenbenzhi = Basics.check_startup(app_name)
-    if startup_wenbenzhi == "surr":
-        startup_wenbenzhi_wenben = "开机启动[√] 修改需重新启动"
-    elif startup_wenbenzhi == "null":
-        startup_wenbenzhi_wenben = "开机启动[×] 修改需重新启动"
-    image = Image.open(f"{server_lujin}/data/zhou.png")  # 替换为自己的图标文件路径  
-    shebeiname = Basics.shebei_name()
-    menu = (
-        pystray.MenuItem(f"当前设备：{shebeiname}", lambda item: Basics.shebei_name_xiugai()),  
-        pystray.MenuItem(f"自定义命令菜单", lambda item: Basics.zdyml_menu()),  
-        pystray.MenuItem(startup_wenbenzhi_wenben, lambda item: Basics.startup_shifouqidong(app_name, f"{server_lujin}\{app_file}")),   
-        pystray.MenuItem("打开目录", lambda item: Basics.open_current_directory()),   
-        pystray.MenuItem("退出", lambda item: Basics.windows_exit()),  
-    ) 
-    serve_windows_mix_icon = pystray.Icon("name", image, f"终端服务\n地址：{get_ipv4_bianhua()}\n已激活服务，端口：{get_ipv4_bianhua()}/{port+1}", menu)  
-    serve_windows_mix_icon_duoxianc = threading.Thread(target=Basics.windowsn_xiaocx)
+
+    #-----------------------Windows 小任务栏
+    print("启动 Windows 小任务栏应用")
+    Taskbar_start = Taskbar(server_lujin, app_name, app_file, get_ipv4_now(), port)
+    serve_windows_mix_icon_duoxianc = threading.Thread(target=Taskbar_start.chushihua)
     serve_windows_mix_icon_duoxianc.daemon = True
     serve_windows_mix_icon_duoxianc.start()
+    #-----------------------Windows 小任务栏
 
+    #-----------------------开放检测到的端口-----------------------
     socket_thread = threading.Thread(target=Basics.run_socket, args=(host, port))
     socket_thread.daemon = True
     socket_thread.start()
+    #-----------------------开放检测到的端口-----------------------
     
     #messagebox.showinfo("涵涵的控制终端核心", f"\n涵涵的控制终端核心 已成功启动 当前地址：{host}:{port}/{port+1}")  
     try:
-        print(f"\n涵涵的控制终端核心 已成功启动 当前地址：{get_ipv4_bianhua()}:{port}/{port+1}")
+        print(f"\n涵涵的控制终端核心 已成功启动 当前地址：{get_ipv4_now()}:{port}/{port+1}")
         serve(app, host=host, port=port + 1)
     except:
-        print(f"Flask 服务 无法启动 地址：{get_ipv4_bianhua()}:{port + 1} 未开放或被占用")
-        messagebox.showinfo("涵涵的控制终端核心", f"Flask 服务 无法启动 地址：{get_ipv4_bianhua()}:{port + 1} 未开放或被占用")  
+        print(f"Flask 服务 无法启动 端口：{port}:{port + 1} 未开放或被占用")
+        messagebox.showinfo("涵涵的控制终端核心", f"Flask 服务 无法启动 端口：{port}:{port + 1} 未开放或被占用")  
         os._exit(0)
 
     
