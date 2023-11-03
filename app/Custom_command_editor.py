@@ -15,7 +15,6 @@ else:
     quanju_lujin_shang = os.path.abspath(os.path.join(quanju_lujin, os.pardir))
 
 if not os.path.exists(f"{quanju_lujin}/data/orderlist.json"):
-    
     if not os.path.exists(f"{quanju_lujin_shang}/data/orderlist.json"):
         messagebox.showinfo("终端命令编辑器", "未能读取到数据库")
         os._exit(0)
@@ -23,6 +22,7 @@ if not os.path.exists(f"{quanju_lujin}/data/orderlist.json"):
         zhenque_lujin = (f"{quanju_lujin_shang}/data/orderlist.json")
 else:
     zhenque_lujin = (f"{quanju_lujin}/data/orderlist.json")
+
 
 class App(tk.Frame):
     def __init__(self, master=None):
@@ -73,6 +73,12 @@ class App(tk.Frame):
         self.add_url_button = tk.Button(self.button_frame, text="添加URL", command=self.add_url)
         self.add_url_button.pack(side="left", padx=10, pady=10)
 
+        # 上移和下移按钮
+        self.move_up_button = tk.Button(self.button_frame, text="上移", command=self.move_up, state="disabled")
+        self.move_up_button.pack(side="left", padx=10, pady=10)
+        self.move_down_button = tk.Button(self.button_frame, text="下移", command=self.move_down, state="disabled")
+        self.move_down_button.pack(side="left", padx=10, pady=10)
+
         # 绑定事件
         self.menu_list.bind("<ButtonRelease-1>", self.on_select)
         self.delete_command_button = tk.Button(
@@ -113,6 +119,8 @@ class App(tk.Frame):
             # no event, clear the selection
             self.modify_command_button.config(state="disabled")
             self.lock_button.config(text="")
+            self.move_up_button.config(state="disabled")
+            self.move_down_button.config(state="disabled")
             return
 
         selection = event.widget.curselection()
@@ -129,6 +137,12 @@ class App(tk.Frame):
             # 设置锁定按钮文本
             lock_text = "已锁定" if item["guding"] == "y" else "未锁定"
             self.lock_button.config(text=lock_text)
+
+            # 设置上移和下移按钮状态
+            if index > 0:
+                self.move_up_button.config(state="normal")
+            if index < len(self.data) - 1:
+                self.move_down_button.config(state="normal")
 
     def modify_command(self):
         selection = self.menu_list.curselection()
@@ -205,6 +219,34 @@ class App(tk.Frame):
                 with open(zhenque_lujin, "w", encoding="utf-8") as f:
                     json.dump(self.data, f, ensure_ascii=False, indent=4)
 
+    def move_up(self):
+        index = self.menu_list.curselection()[0]
+        if index > 0:
+            self.data[index], self.data[index - 1] = self.data[index - 1], self.data[index]
+            self.menu_list.delete(0, tk.END)
+            self.init_menu_list()
+            self.save_data()
+            self.menu_list.selection_clear(0, tk.END)
+            self.menu_list.select_set(index - 1)
+            self.on_select(None)
+            self.update_move_buttons()  # 更新上移和下移按钮状态
+
+    def move_down(self):
+        index = self.menu_list.curselection()[0]
+        if index < len(self.data) - 1:
+            self.data[index], self.data[index + 1] = self.data[index + 1], self.data[index]
+            self.menu_list.delete(0, tk.END)
+            self.init_menu_list()
+            self.save_data()
+            self.menu_list.selection_clear(0, tk.END)
+            self.menu_list.select_set(index + 1)
+            self.on_select(None)
+            self.update_move_buttons()  # 更新上移和下移按钮状态
+
+    def update_move_buttons(self):
+        index = self.menu_list.curselection()[0]
+        self.move_up_button.config(state="normal" if index > 0 else "disabled")
+        self.move_down_button.config(state="normal" if index < len(self.data) - 1 else "disabled")
 
 class Dialog(simpledialog.Dialog):
     def __init__(self, parent, title, text, initialvalue=None):
