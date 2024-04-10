@@ -8,7 +8,7 @@
 ## 简介
 此项目是服务端终端用于创建终端服务，接受客户端(安卓移动端)的命令，对接客户端(安卓移动端)面板  
 **设计方法：** 使用 服务端创建API服务，客户端(安卓移动端)来访问API进行交互，以此快捷执行命令   
-**功能概述：** 可以自定义执行cmd命令，自定义执行其他API链接(只支持Get方法，无法使用POST)    
+**功能概述：** 可以自定义执行cmd命令，自定义执行其他API链接(支持Get、Post)    
 
 ## 使用截图
 ![界面1](./png/1.png)
@@ -42,15 +42,18 @@
 ## 项目目录结构
 ./涵涵的超级控制终端    
 ├── data/                 --数据    
-│   ├── orderlist.json    --API链接    
+│   ├── orderlist.json    --功能配置     
 │   └── zhou.png          --图标   
 ├── log/                  --日志    
 │   └── last.log          --当前日志，会自动打包上一次的日志     
 ├── app/                  --一些可用上的辅助程序         
 │   └── Custom_command_editor.py          --快捷API链接编辑器      
+│   └── AudioBrightnes.ps1 --powershell的ps1脚本 用于查询屏幕亮度
+│   └── AudioVolume.ps1   --powershell的ps1脚本 用于查询系统声音
+│   └── nircmd.exe        --nircmd.exe windows设置快捷命令
 ├── requirements.txt      --所需库      
 ├── REMDAD.md     
-├── Localcommand.py       --API对应的本地命令-由主程序调用    
+├── WinDC.py              --底层基层命令    
 ├── ZDserver.py           --服务端主程序          
 ├── WinTaskbar.py         --在Windows的小任务栏-由主程序调用    
 ├── .gitignore   
