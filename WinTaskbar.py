@@ -26,12 +26,17 @@ class Taskbar():
         command_exit_menu = pystray.MenuItem("退出", lambda item: Taskbar.command_exit_menu())
 
         #动态菜单选项
+        # 当前设备
         name_menu = pystray.MenuItem(f"当前设备：{Taskbar.shebei_name(self.server_lujin)}", lambda item: Taskbar.shebei_name_xiugai(app_name_taskbar, server_lujin_taskbar,app_file_taskbar))  
+        # 开机启动
         command_bootup_menu = pystray.MenuItem(Taskbar.command_bootup_menu_name(self.app_name), lambda item: Taskbar.command_bootup_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
+        # 亮度控制
+        command_AudioBrightnes_menu = pystray.MenuItem(Taskbar.command_AudioBrightnes_menu_name(self.app_name,self.server_lujin), lambda item: Taskbar.command_AudioBrightnes_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
 
         menu = (
             name_menu,
             app_open_custom_menu,
+            command_AudioBrightnes_menu,
             command_bootup_menu,
             open_catalogue_menu,
             command_exit_menu,
@@ -52,10 +57,12 @@ class Taskbar():
         open_catalogue_menu = pystray.MenuItem("打开目录", lambda item: Taskbar.open_current_directory(server_lujin))
         command_exit_menu = pystray.MenuItem("退出", lambda item: Taskbar.command_exit_menu())
         name_menu = pystray.MenuItem(f"当前设备：{Taskbar.shebei_name(server_lujin)}", lambda item: Taskbar.shebei_name_xiugai(app_name, server_lujin,app_file))  
-        command_bootup_menu = pystray.MenuItem(Taskbar.command_bootup_menu_name(app_name), lambda item: Taskbar.command_bootup_menu_startup_shifouqidong(app_name, server_lujin,app_file),)
+        command_bootup_menu = pystray.MenuItem(Taskbar.command_bootup_menu_name(app_name), lambda item: Taskbar.command_bootup_menu_startup_shifouqidong(app_name, server_lujin, app_file),)
+        command_AudioBrightnes_menu = pystray.MenuItem(Taskbar.command_AudioBrightnes_menu_name(app_name,server_lujin), lambda item: Taskbar.command_AudioBrightnes_menu_startup_shifouqidong(app_name, server_lujin, app_file),)
         menu = (
             name_menu,
             app_open_custom_menu,
+            command_AudioBrightnes_menu,
             command_bootup_menu,
             open_catalogue_menu,
             command_exit_menu,
@@ -161,3 +168,70 @@ class Taskbar():
         winreg.SetValueEx(reg_key, app_name, 0, winreg.REG_SZ, app_path)
         winreg.CloseKey(reg_key)
     #---------------------------------------------------------------------------------------------------------
+        
+    #屏幕亮度
+    def command_AudioBrightnes_menu_name(app_name,server_lujin):
+        startup_wenbenzhi = Taskbar.command_AudioBrightnes_menu_check_startup(app_name,server_lujin)
+        if startup_wenbenzhi == "surr":
+            startup_wenbenzhi_wenben = "亮度控制 【√】"
+        elif startup_wenbenzhi == "null":
+            startup_wenbenzhi_wenben = "亮度控制 【X】"
+        return startup_wenbenzhi_wenben
+    
+    def command_AudioBrightnes_menu_check_startup(app_name,server_lujin):
+        with open(f'{server_lujin}\\data\\orderlist.json', 'r', encoding='utf-8') as file:
+            data = json.load(file)
+        for item in data:
+            if item['title'] == "亮度控制":
+                return "surr"
+        return "null"
+
+    #更新小任务栏程序的右键菜单
+    def command_AudioBrightnes_menu_startup_shifouqidong(app_name, server_lujin,app_file):
+        if Taskbar.command_AudioBrightnes_menu_check_startup(app_name,server_lujin) == "surr":
+            Taskbar.command_AudioBrightnes_menu_remove_from_startup(app_name,server_lujin)
+            Taskbar.meun_dongtai(app_name, server_lujin,app_file)
+        elif Taskbar.command_AudioBrightnes_menu_check_startup(app_name,server_lujin) == "null":
+            Taskbar.command_AudioBrightnes_menu_add_to_startup(server_lujin)
+            Taskbar.meun_dongtai(app_name, server_lujin,app_file)
+
+    def command_AudioBrightnes_menu_remove_from_startup(app_name, server_lujin):
+        with open(f'{server_lujin}\\data\\orderlist.json', 'r', encoding='utf-8') as file:
+            data = json.load(file)
+        item_to_remove = None
+        for item in data:
+            if item['title'] == '亮度控制':
+                item_to_remove = item
+                break
+        if item_to_remove:
+            data.remove(item_to_remove)
+        with open(f'{server_lujin}\\data\\orderlist.json', 'w', encoding='utf-8') as file:
+            json.dump(data, file, ensure_ascii=False, indent=2)
+                
+
+    def command_AudioBrightnes_menu_add_to_startup(server_lujin):
+        new_item = {
+            "title": "亮度控制",
+            "apiUrl": "http://192.168.1.6:5202/command",
+            "guding": "n",
+            "datacommand": "nircmd.exe setbrightness {value}",
+            "value": 50
+        }
+        
+        with open(f'{server_lujin}\\data\\orderlist.json', 'r', encoding='utf-8') as file:
+            data = json.load(file)
+        
+        found_audio_control = False
+        for index, item in enumerate(data):
+            if item['title'] == '音量控制':
+                data.insert(index + 1, new_item)
+                found_audio_control = True
+                break
+        
+        if not found_audio_control:
+            data.append(new_item)
+        
+        with open(f'{server_lujin}\\data\\orderlist.json', 'w', encoding='utf-8') as file:
+            json.dump(data, file, ensure_ascii=False, indent=2)
+
+        
