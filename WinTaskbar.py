@@ -149,7 +149,7 @@ class Taskbar():
             Taskbar.command_bootup_menu_remove_from_startup(app_name)
             Taskbar.meun_dongtai(app_name, server_lujin,app_file)
         elif Taskbar.command_bootup_menu_check_startup(app_name) == "null":
-            Taskbar.command_bootup_menu_add_to_startup(app_name, f"{server_lujin}\{app_file}")
+            Taskbar.command_bootup_menu_add_to_startup(app_name, f"{server_lujin}{os.sep}{app_file}")
             Taskbar.meun_dongtai(app_name, server_lujin,app_file)
 
 
@@ -179,7 +179,7 @@ class Taskbar():
         return startup_wenbenzhi_wenben
     
     def command_AudioBrightnes_menu_check_startup(app_name,server_lujin):
-        with open(f'{server_lujin}\\data\\orderlist.json', 'r', encoding='utf-8') as file:
+        with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
         for item in data:
             if item['title'] == "亮度控制":
@@ -196,7 +196,7 @@ class Taskbar():
             Taskbar.meun_dongtai(app_name, server_lujin,app_file)
 
     def command_AudioBrightnes_menu_remove_from_startup(app_name, server_lujin):
-        with open(f'{server_lujin}\\data\\orderlist.json', 'r', encoding='utf-8') as file:
+        with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
         item_to_remove = None
         for item in data:
@@ -205,7 +205,7 @@ class Taskbar():
                 break
         if item_to_remove:
             data.remove(item_to_remove)
-        with open(f'{server_lujin}\\data\\orderlist.json', 'w', encoding='utf-8') as file:
+        with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'w', encoding='utf-8') as file:
             json.dump(data, file, ensure_ascii=False, indent=2)
                 
 
@@ -218,7 +218,7 @@ class Taskbar():
             "value": 50
         }
         
-        with open(f'{server_lujin}\\data\\orderlist.json', 'r', encoding='utf-8') as file:
+        with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
         
         found_audio_control = False
@@ -231,7 +231,7 @@ class Taskbar():
         if not found_audio_control:
             data.append(new_item)
         
-        with open(f'{server_lujin}\\data\\orderlist.json', 'w', encoding='utf-8') as file:
+        with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'w', encoding='utf-8') as file:
             json.dump(data, file, ensure_ascii=False, indent=2)
 
         
