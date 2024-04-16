@@ -9,7 +9,7 @@ from tkinter import messagebox
 
 ############################
 #配置文件
-config_orderlist = "data\orderlist.json"
+config_orderlist = "data\\orderlist.json"
 ############################
 if getattr(sys, 'frozen', False):
     server_lujin = os.path.dirname(sys.executable)
@@ -21,7 +21,7 @@ class PPowerShell():
         pass
 
     def file_json_Audio():
-        with open(f'{server_lujin}\{config_orderlist}', 'r', encoding='utf-8') as file:
+        with open(f'{server_lujin}{os.sep}{config_orderlist}', 'r', encoding='utf-8') as file:
             data = json.load(file)
         for item in data:
             if item['title'] == '音量控制':
@@ -29,7 +29,7 @@ class PPowerShell():
                 if Audio_value is not None:
                     Audio_value_True = float(Audio_value) * 100
                     item['value'] = int(Audio_value_True)
-                    with open(f'{server_lujin}\{config_orderlist}', 'w', encoding='utf-8') as file:
+                    with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
                         json.dump(data, file, indent=2, ensure_ascii=False)
             if item['title'] == '亮度控制':
                 Audio_value = PPowerShell.ps1_get('AudioBrightnes')
@@ -37,20 +37,20 @@ class PPowerShell():
                     if Audio_value[0] is not None:
                         Audio_value_True = Audio_value[0]
                         item['value'] = int(Audio_value_True)
-                        with open(f'{server_lujin}\{config_orderlist}', 'w', encoding='utf-8') as file:
+                        with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
                             json.dump(data, file, indent=2, ensure_ascii=False)      
                 except:
                     if Audio_value is not None:
                         Audio_value_True = Audio_value[0]
                         item['value'] = int(Audio_value_True)
-                        with open(f'{server_lujin}\{config_orderlist}', 'w', encoding='utf-8') as file:
+                        with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
                             json.dump(data, file, indent=2, ensure_ascii=False)   
     def file_json_geshihua(ipv4,port):
         #格式化dataj json数据，设置为当机地址
         #----------历史屎坑--------如果去除它则无法运行
         PPowerShell.get_ipv4_address()
         #----------历史屎坑--------如果去除它则无法运行
-        with open(f'{server_lujin}\{config_orderlist}', 'r', encoding='utf-8') as file:
+        with open(f'{server_lujin}{os.sep}{config_orderlist}', 'r', encoding='utf-8') as file:
             data = json.load(file)
         for item in data:
             if item['guding'] == 'n':
@@ -60,7 +60,7 @@ class PPowerShell():
                     formatted_address = address.replace(address, f'{ipv4}:{port+1}')
                     item['apiUrl'] = item['apiUrl'].replace(address, formatted_address)
 
-        with open(f'{server_lujin}\{config_orderlist}', 'w', encoding='utf-8') as file:
+        with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
             json.dump(data, file, indent=2, ensure_ascii=False)
         print("读取了配置文件")
 
@@ -136,11 +136,11 @@ class PPowerShell():
                 #更改Windows小任务栏的地址
                 Taskbar_start.icon_dongtai(current_address,port)
                 #首先检查是否有 “音量控制、亮度控制” json配置信息，如果有则调用 Windows PowerShell 来查询数值并更新到配置文件中
-                PPowerShell.file_json_Audio()
+            PPowerShell.file_json_Audio()
             time.sleep(20)
 
     def ps1_get(name):
-        ps_script_path = f"{server_lujin}\\app\\{name}.ps1"
+        ps_script_path = f"{server_lujin}{os.sep}app{os.sep}{name}.ps1"
         result = subprocess.run(['powershell', '-File', ps_script_path], capture_output=True, text=True, shell=True)
         stdout = result.stdout
         stderr = result.stderr
