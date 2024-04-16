@@ -20,14 +20,14 @@ else:
 log_file = "last.log" 
 app_file = os.path.basename(sys.argv[0])
 zip_file_name = time.strftime("%Y_%m_%d_%H_%M_%S") + ".zip"  
-if os.path.exists(f"{server_lujin}\log\{log_file}"):
-    with zipfile.ZipFile(f"{server_lujin}\log\{zip_file_name}", 'w') as zf:
-        zf.write(f"{server_lujin}\log\{log_file}", arcname=log_file)
+if os.path.exists(f"{server_lujin}{os.sep}log{os.sep}{log_file}"):
+    with zipfile.ZipFile(f"{server_lujin}{os.sep}log{os.sep}{zip_file_name}", 'w') as zf:
+        zf.write(f"{server_lujin}{os.sep}log{os.sep}{log_file}", arcname=log_file)
 else:
-    os.makedirs(f"{server_lujin}\log", exist_ok=True)
-    with open(f"{server_lujin}\log\{log_file}", "w") as f:
+    os.makedirs(f"{server_lujin}{os.sep}log", exist_ok=True)
+    with open(f"{server_lujin}{os.sep}log{os.sep}{log_file}", "w") as f:
         f.write("")
-log_file_name = (f"{server_lujin}\log\{log_file}")
+log_file_name = (f"{server_lujin}{os.sep}log{os.sep}{log_file}")
 
 app = Flask(__name__)
 CORS(app)
@@ -55,7 +55,7 @@ class flask_api_web():
         current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         nrong = (f"【{current_time}】\n[控制台]: 设备 {client_ip} 进行访问hello\n")
         print(nrong)
-        with open(f"{server_lujin}\log\{log_file}", "a", encoding="utf-8") as f:
+        with open(f"{server_lujin}{os.sep}log{os.sep}{log_file}", "a", encoding="utf-8") as f:
             f.write(nrong)
 
         response = {
@@ -132,7 +132,7 @@ class flask_api_web():
         if json_data.get("name") == "han han":
             data_command = json_data.get("command")
             #检测 命令是否有用上 app文件夹中的任意程序(应该先查询app文件夹的文件)，如果有则将app文件夹中的程序作为绝对路径
-            app_files = os.listdir(f"{server_lujin}\\app")
+            app_files = os.listdir(f"{server_lujin}{os.sep}app")
             print(app_files)
             for file in app_files:
                 if file in data_command:
@@ -227,8 +227,8 @@ if __name__ == '__main__':
     else:
         with open(f"{server_lujin}/data/one", "w") as file:
             pass
-        Taskbar.command_bootup_menu_add_to_startup(app_name, f"{server_lujin}\{app_file}")
-    print(f"{server_lujin}\{app_file}")
+        Taskbar.command_bootup_menu_add_to_startup(app_name, f"{server_lujin}{os.sep}{app_file}")
+    print(f"{server_lujin}{os.sep}{app_file}")
 
     #-----------------------Windows 小任务栏
     print("启动 Windows 小任务栏应用")
