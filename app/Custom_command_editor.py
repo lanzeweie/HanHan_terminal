@@ -4,6 +4,7 @@ import tkinter.simpledialog as simpledialog
 from tkinter import messagebox
 import os
 import sys
+import socket
 
 # 初始化
 # 判断环境是exe还是py
@@ -172,11 +173,21 @@ class App(tk.Frame):
         if title is not None:
             dialog = Dialog(self.master, "添加自定义命令", "请输入命令", "")
             datacommand = dialog.result
+            def get_ipv4_now():
+                ip_address = None
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    s.connect(('8.8.8.8', 80))
+                    ip_address = s.getsockname()[0]
+                    s.close()
+                except socket.error:
+                    pass
+                return ip_address
             if datacommand is not None:
                 self.data.append(
                     {
                         "title": title,
-                        "apiUrl": "http://192.168.208.17:5202/command",
+                        "apiUrl": f"http://{get_ipv4_now()}:5202/command",
                         "guding": "n",
                         "datacommand": datacommand,
                     }
