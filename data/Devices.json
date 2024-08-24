@@ -1,0 +1,6 @@
+{
+  "name": "仅允许授权设备",
+  "enable": "true",
+  "authorizedDevices": [],
+  "blacklistedDevices": []
+}
