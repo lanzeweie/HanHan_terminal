@@ -1,9 +1,14 @@
 # Windows 的小任务栏
-import pystray,json,winreg,os
-from PIL import Image  
-from tkinter import messagebox  
-import tkinter as tk
+import json
+import os
 import subprocess
+import tkinter as tk
+import winreg
+from tkinter import messagebox  # 确保导入了Toplevel
+
+import pystray
+from PIL import Image
+
 
 class Taskbar():
     def __init__(self,server_lujin,app_name,app_file,ipv4_ip,port):
@@ -32,10 +37,13 @@ class Taskbar():
         command_bootup_menu = pystray.MenuItem(Taskbar.command_bootup_menu_name(self.app_name), lambda item: Taskbar.command_bootup_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
         # 亮度控制
         command_AudioBrightnes_menu = pystray.MenuItem(Taskbar.command_AudioBrightnes_menu_name(self.app_name,self.server_lujin), lambda item: Taskbar.command_AudioBrightnes_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
+        # 仅授权设备
+        command_Devices_menu = pystray.MenuItem(Taskbar.command_devices_menu_name(self.app_name,self.server_lujin), lambda item: Taskbar.command_devices_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
 
         menu = (
             name_menu,
             app_open_custom_menu,
+            command_Devices_menu,
             command_AudioBrightnes_menu,
             command_bootup_menu,
             open_catalogue_menu,
@@ -59,9 +67,11 @@ class Taskbar():
         name_menu = pystray.MenuItem(f"当前设备：{Taskbar.shebei_name(server_lujin)}", lambda item: Taskbar.shebei_name_xiugai(app_name, server_lujin,app_file))  
         command_bootup_menu = pystray.MenuItem(Taskbar.command_bootup_menu_name(app_name), lambda item: Taskbar.command_bootup_menu_startup_shifouqidong(app_name, server_lujin, app_file),)
         command_AudioBrightnes_menu = pystray.MenuItem(Taskbar.command_AudioBrightnes_menu_name(app_name,server_lujin), lambda item: Taskbar.command_AudioBrightnes_menu_startup_shifouqidong(app_name, server_lujin, app_file),)
+        command_Devices_menu = pystray.MenuItem(Taskbar.command_devices_menu_name(app_name,server_lujin), lambda item: Taskbar.command_devices_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
         menu = (
             name_menu,
             app_open_custom_menu,
+            command_Devices_menu,
             command_AudioBrightnes_menu,
             command_bootup_menu,
             open_catalogue_menu,
@@ -234,4 +244,108 @@ class Taskbar():
         with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'w', encoding='utf-8') as file:
             json.dump(data, file, ensure_ascii=False, indent=2)
 
-        
+    #-陌生设备接入-----------------------------------------------------------------------------------------------
+    # 加载设备配置文件width
+    def show_custom_alert(model_id, device_id, command, result_queue):
+        def on_trust():
+            result_queue.put("trust")
+            root.destroy()
+
+        def on_allow_once():
+            result_queue.put("allow_once")
+            root.destroy()
+
+        def on_reject():
+            result_queue.put("reject")
+            root.destroy()
+
+        def on_blacklist():
+            result_queue.put("blacklist")
+            root.destroy()
+
+        root = tk.Tk()
+        root.withdraw()  # 隐藏主窗口
+        alert_window = tk.Toplevel(root)
+        alert_window.title("陌生设备发起请求")
+        # 设置窗口图标
+        try:
+            icon = tk.PhotoImage(file="data/zhou.png")
+            alert_window.iconphoto(False, icon)
+        except tk.TclError:
+            print("图标文件加载失败，确保路径正确且文件存在。")
+            
+        window_width = 300
+        window_height = 200
+        screen_width = alert_window.winfo_screenwidth()
+        screen_height = alert_window.winfo_screenheight()
+        position_top = int(screen_height / 2 - window_height / 2)
+        position_right = int(screen_width / 2 - window_width / 2)
+        alert_window.geometry(f'{window_width}x{window_height}+{position_right}+{position_top}')
+
+        label_info = tk.Label(alert_window, text=f"设备型号: {model_id}\n设备ID: {device_id}\n请求命令: {command}",
+                            font=("Helvetica", 13), pady=10)
+        label_info.pack()
+
+        button_frame = tk.Frame(alert_window)
+        button_frame.pack(pady=20)
+        button_style = {"font": ("Helvetica", 12), "bg": "#007AFF", "fg": "white", "relief": "flat", "bd": 0}
+
+        def create_button(text, command):
+            width = max(12, min(24, len(text) + 4))
+            return tk.Button(button_frame, text=text, command=command, width=width, **button_style)
+
+        button_trust = create_button("信任", on_trust)
+        button_trust.grid(row=0, column=0, padx=5, pady=5)
+        button_allow_once = create_button("同意一次", on_allow_once)
+        button_allow_once.grid(row=0, column=1, padx=5, pady=5)
+        button_reject = create_button("拒绝", on_reject)
+        button_reject.grid(row=1, column=0, padx=5, pady=5)
+        button_blacklist = create_button("加入黑名单", on_blacklist)
+        button_blacklist.grid(row=1, column=1, padx=5, pady=5)
+
+        def on_close():
+            result_queue.put("reject")  # 默认返回拒绝
+            root.destroy()
+
+        alert_window.protocol("WM_DELETE_WINDOW", on_close)
+        root.mainloop()
+    #---------------------------------------------------------------------------------------------------------
+    #--------------------------------------------设置设备来源-------------------------------------------------------------
+    def command_devices_menu_name(app_name,server_lujin):
+        startup_wenbenzhi = Taskbar.command_devices_menu_check_startup(app_name,server_lujin)
+        if startup_wenbenzhi == "surr":
+            startup_wenbenzhi_wenben = "仅授权设备 【√】"
+        elif startup_wenbenzhi == "null":
+            startup_wenbenzhi_wenben = "仅授权设备 【X】"
+        return startup_wenbenzhi_wenben
+    
+    def command_devices_menu_check_startup(app_name,server_lujin):
+        with open(f'{server_lujin}{os.sep}data{os.sep}Devices.json', 'r', encoding='utf-8') as file:
+            data = json.load(file)
+        if data['enable'] == "true":
+            return "surr"
+        return "null"
+
+    #更新小任务栏程序的右键菜单
+    def command_devices_menu_startup_shifouqidong(app_name, server_lujin,app_file):
+        if Taskbar.command_devices_menu_check_startup(app_name,server_lujin) == "surr":
+            Taskbar.command_devices_menu_remove_from_startup(app_name,server_lujin)
+            Taskbar.meun_dongtai(app_name, server_lujin,app_file)
+        elif Taskbar.command_devices_menu_check_startup(app_name,server_lujin) == "null":
+            Taskbar.command_devices_menu_add_to_startup(server_lujin)
+            Taskbar.meun_dongtai(app_name, server_lujin,app_file)
+
+    def command_devices_menu_remove_from_startup(app_name, server_lujin):
+        with open(f'{server_lujin}{os.sep}data{os.sep}Devices.json', 'r', encoding='utf-8') as file:
+            data = json.load(file)
+        data['enable'] = "false"
+        with open(f'{server_lujin}{os.sep}data{os.sep}Devices.json', 'w', encoding='utf-8') as file:
+            json.dump(data, file, ensure_ascii=False, indent=2)
+                
+
+    def command_devices_menu_add_to_startup(server_lujin):
+        with open(f'{server_lujin}{os.sep}data{os.sep}Devices.json', 'r', encoding='utf-8') as file:
+            data = json.load(file)
+        data['enable'] = "true"
+        with open(f'{server_lujin}{os.sep}data{os.sep}Devices.json', 'w', encoding='utf-8') as file:
+            json.dump(data, file, ensure_ascii=False, indent=2)
