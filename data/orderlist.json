@@ -8,16 +8,6 @@
     "//3": "y 就不会改变apiUrl的地址，n就会格式化为本机地址"
   },
   {
-    "title": "锁屏",
-    "apiUrl": "http://192.168.1.6:5202/suoping",
-    "guding": "n"
-  },
-  {
-    "title": "关机(30s)",
-    "apiUrl": "http://192.168.1.6:5202/stop",
-    "guding": "n"
-  },
-  {
     "title": "立即关机",
     "apiUrl": "http://192.168.1.6:5202/command",
     "guding": "n",
@@ -28,7 +18,7 @@
     "apiUrl": "http://192.168.1.6:5202/command",
     "guding": "n",
     "datacommand": "cmd.exe /c nircmd.exe setsysvolume {value}",
-    "value": 72
+    "value": 74
   },
   {
     "title": "随机一句诗歌词",
