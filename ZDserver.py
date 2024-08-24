@@ -1,14 +1,24 @@
-from waitress import serve
-from flask import Flask, jsonify, request
-from flask_cors import CORS
-import datetime,socket,threading,json,sys,os,subprocess,winreg
-import time  
+import datetime
+import json
+import os
+import queue
+import socket
+import subprocess
+import sys
+import threading
+import time
+import winreg
 import zipfile
 # 任务栏小图标
-from tkinter import messagebox  
-from WinTaskbar import Taskbar
+from tkinter import messagebox
+
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+from waitress import serve
+
 # PPowerShell库
 from WinDC import PPowerShell
+from WinTaskbar import Taskbar
 
 #初始化
 #判断环境是exe还是py
@@ -81,46 +91,13 @@ class flask_api_web():
         except json.JSONDecodeError:
             print("JSON解码错误")
             return None
-    
-    @app.route('/stop', methods=['GET'])
-    def run_stop():
-        client_ip = request.remote_addr  # 获取客户端的 IP 地址
-        current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        nrong = (f"【{current_time}】\n[控制台]: 设备 {client_ip} 发起关机命令\n")
-        print(nrong)
-        with open(log_file_name, "a", encoding="utf-8") as f:
-            f.write(nrong)
-        os.system("shutdown /s /f")
-        response = {
-            "title": "命令返回状态",
-            "execution_time": current_time,
-            "success": True
-        }
-        return jsonify(response)
-
-    @app.route('/suoping', methods=['GET'])
-    def run_suoping():
-        client_ip = request.remote_addr  # 获取客户端的 IP 地址
-        current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        nrong = (f"【{current_time}】\n[控制台]: 设备 {client_ip} 发起锁屏命令\n")
-        print(nrong)
-        with open(log_file_name, "a", encoding="utf-8") as f:
-            f.write(nrong)
-        os.system("rundll32.exe user32.dll,LockWorkStation")
-        response = {
-            "title": "命令返回状态",
-            "execution_time": current_time,
-            "success": True
-        }
-        return jsonify(response)
 
     @app.route('/command', methods=['POST'])
     def run_command_zdy():
-        client_ip = request.remote_addr  # 获取客户端的 IP 地址
+        client_ip = request.remote_addr
         current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        json_data = request.get_json()  # 获取请求中的 JSON 数据
+        json_data = request.get_json()
 
-        # 打印 JSON 内容和时间
         print(f"【{current_time}】\n[控制台]: 设备 {client_ip} 发起命令 【自定义命令】")
         print("JSON 数据:", json_data)
 
@@ -128,10 +105,68 @@ class flask_api_web():
         with open(log_file_name, "a", encoding="utf-8") as f:
             f.write(nrong)
 
-        # 检查 name 字段是否为 "han han"，提取 data 字段的值
+        config = Basics.load_device_config()
+        enable = config.get("enable", "false").lower() == "true"
+        
+        if enable:
+            device_id = json_data.get('deviceID')
+            model_id = json_data.get('modelID')
+
+            blacklisted_devices = config.get("blacklistedDevices", [])
+            for device in blacklisted_devices:
+                if device.get("deviceId") == device_id:
+                    response = {
+                        "title": "命令返回状态",
+                        "execution_time": current_time,
+                        "success": False,
+                        "cmd_back": "设备在黑名单中，不允许执行命令"
+                    }
+                    return jsonify(response)
+
+            authorized_devices = config.get("authorizedDevices", [])
+            authorized = any(device.get("deviceId") == device_id for device in authorized_devices)
+
+            if not authorized:
+                # 当设备未被授权且不在黑名单时，弹出窗口
+                def handle_alert():
+                    result_queue = queue.Queue()
+                    alert_thread = threading.Thread(target=Taskbar.show_custom_alert, args=(model_id, device_id, json_data.get("command"), result_queue))
+                    alert_thread.start()
+                    alert_thread.join()  # 等待弹窗关闭
+                    choice = result_queue.get()
+                    return choice
+                
+                user_choice = handle_alert()
+                print(user_choice)
+                if user_choice == "trust":
+                    # 信任设备并加入 authorizedDevices 列表
+                    authorized_devices.append({"deviceId": device_id, "deviceName": model_id})
+                    config["authorizedDevices"] = authorized_devices
+                    with open('data/Devices.json', 'w', encoding='utf-8') as f:
+                        json.dump(config, f, ensure_ascii=False, indent=4)
+                elif user_choice == "blacklist":
+                    # 将设备加入黑名单
+                    blacklisted_devices.append({"deviceId": device_id, "deviceName": model_id})
+                    config["blacklistedDevices"] = blacklisted_devices
+                    with open('data/Devices.json', 'w', encoding='utf-8') as f:
+                        json.dump(config, f, ensure_ascii=False, indent=4)
+                elif user_choice == "reject":
+                    # 设备请求被拒绝
+                    response = {
+                        "title": "命令返回状态",
+                        "execution_time": current_time,
+                        "success": False,
+                        "cmd_back": "设备未授权，不允许执行命令"
+                    }
+                    return jsonify(response)
+                elif user_choice == "allow_once":
+                    # 同意一次，仅执行这次命令
+                    pass
+
+        # 执行命令的原有逻辑
         if json_data.get("name") == "han han":
             data_command = json_data.get("command")
-            #检测 命令是否有用上 app文件夹中的任意程序(应该先查询app文件夹的文件)，如果有则将app文件夹中的程序作为绝对路径
+            # 检测命令是否有用上 app 文件夹中的任意程序
             app_files = os.listdir(f"{server_lujin}{os.sep}app")
             print(app_files)
             for file in app_files:
@@ -144,20 +179,22 @@ class flask_api_web():
             if json_data.get("value") is not None:
                 data_value = json_data.get("value")
                 print("value 值:", data_value)
-                def data_intstat(data_command,data_value):
+
+                def data_intstat(data_command, data_value):
                     if "nircmd.exe setsysvolume" in data_command:
                         volume = int(data_value)
                         converted_value = int(volume * 655.35)  # 将 1-100 映射到 0-65535
                         print(f"检测到是 nircmd.exe setsysvolume {volume}【音量调节命令】并格式化数值为 {converted_value}")
-                        data_command = data_command.replace('{value}',str(converted_value))
+                        data_command = data_command.replace('{value}', str(converted_value))
                         print(data_command)
                         return data_command
                     else:
                         formatted_command = data_command.replace('{value}', str(data_value))
                         return formatted_command
-                data_command = data_intstat(data_command,data_value)
+
+                data_command = data_intstat(data_command, data_value)
                 print(f"【控制台】最终执行命令：{data_command}")
-            
+
             # 执行命令 【自定义命令】 的逻辑
             try:
                 output = subprocess.check_output(data_command, shell=True, stderr=subprocess.STDOUT, universal_newlines=True)
@@ -168,7 +205,6 @@ class flask_api_web():
                 cmd_back = e.output
             if cmd_back == '':
                 cmd_back = "命令成功发出\n返回结果为空"
-            
         else:
             cmd_back = ""
 
@@ -204,7 +240,11 @@ class Basics():
         reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
         winreg.SetValueEx(reg_key, app_name, 0, winreg.REG_SZ, app_path)
         winreg.CloseKey(reg_key)
-
+        
+    def load_device_config():
+        with open(f'data{os.sep}Devices.json', 'r', encoding='utf-8') as file:
+            return json.load(file)
+        
 if __name__ == '__main__':
     print("------------------------------\n")
     print("涵的涵涵的控制终端核心")
