@@ -242,7 +242,7 @@ class Basics():
         winreg.CloseKey(reg_key)
         
     def load_device_config():
-        with open(f'data{os.sep}Devices.json', 'r', encoding='utf-8') as file:
+        with open(f'{server_lujin}{os.sep}data{os.sep}Devices.json', 'r', encoding='utf-8') as file:
             return json.load(file)
         
 if __name__ == '__main__':
