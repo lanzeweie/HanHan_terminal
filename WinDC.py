@@ -1,11 +1,11 @@
 #调用 Windows PowerShell
-import sys
-import os
-import subprocess
 import json
-import time
+import os
 import socket
-from tkinter import messagebox  
+import subprocess
+import sys
+import time
+from tkinter import messagebox
 
 ############################
 #配置文件
@@ -34,8 +34,8 @@ class PPowerShell():
             if item['title'] == '亮度控制':
                 Audio_value = PPowerShell.ps1_get('AudioBrightnes')
                 try:
-                    if Audio_value[0] is not None:
-                        Audio_value_True = Audio_value[0]
+                    if Audio_value is not None:
+                        Audio_value_True = Audio_value
                         item['value'] = int(Audio_value_True)
                         with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
                             json.dump(data, file, indent=2, ensure_ascii=False)      
@@ -148,7 +148,7 @@ class PPowerShell():
         if stdout is not None and stdout.strip().replace('\n\n', '\n') != '':
             if stdout is not None:
                 stdout = stdout.strip().replace('\n\n', '\n')
-                print("音量的值为:"+stdout)
+                print("值为:"+stdout)
                 return stdout
         elif stderr is not None and stderr.strip().replace('\n\n', '\n') != '':
             error_send = None
@@ -162,4 +162,4 @@ class PPowerShell():
             return None
 
 if __name__ == "__main__":
-    print(PPowerShell('AudioVolume').ps1_get())
+    print(PPowerShell.file_json_Audio())
