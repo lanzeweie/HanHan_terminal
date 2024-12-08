@@ -3,8 +3,14 @@
 /data/one
 /bulid
 DABAO.md
-
+/upx-4.2.3-win64
 /__pycache__
-
-
+install.txt
+/涵涵终端打包
 #./.gitignore
+ZDserver.exe
+ZDserver_debug.spec
+ZDserver.spec
+/dist
+build
+.history

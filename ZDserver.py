@@ -1,7 +1,6 @@
 import datetime
 import json
 import os
-import queue
 import socket
 import subprocess
 import sys
@@ -42,6 +41,8 @@ log_file_name = (f"{server_lujin}{os.sep}log{os.sep}{log_file}")
 app = Flask(__name__)
 CORS(app)
 
+# 全局锁
+device_lock = threading.Lock()
 class flask_api_web():
     @app.before_request
     def check_headers():
@@ -75,10 +76,18 @@ class flask_api_web():
         }
         return jsonify(response)
 
-    @app.route('/orderlist', methods=['GET'])
+    @app.route('/orderlist', methods=['POST'])
     def orderlist():
         client_ip = request.remote_addr  # 获取客户端的 IP 地址
-        print (client_ip)
+        json_data = request.get_json()
+        current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        print(f"【{current_time}】\n[控制台]: 设备 {client_ip} 询问链接")
+        print("JSON 数据:", json_data)
+        
+        verify_result = PPowerShell.verify_device(json_data, device_lock)
+        if verify_result is not True:
+            return verify_result
+
         current_directory = server_lujin
         json_file_path = os.path.join(current_directory, "data", "orderlist.json")
         try:
@@ -105,103 +114,36 @@ class flask_api_web():
         with open(log_file_name, "a", encoding="utf-8") as f:
             f.write(nrong)
 
-        config = Basics.load_device_config()
-        enable = config.get("enable", "false").lower() == "true"
-        
-        if enable:
-            device_id = json_data.get('deviceID')
-            model_id = json_data.get('modelID')
+        verify_result = PPowerShell.verify_device(json_data, device_lock)
+        if verify_result is not True:
+            return verify_result
 
-            blacklisted_devices = config.get("blacklistedDevices", [])
-            for device in blacklisted_devices:
-                if device.get("deviceId") == device_id:
-                    response = {
-                        "title": "命令返回状态",
-                        "execution_time": current_time,
-                        "success": False,
-                        "cmd_back": "设备在黑名单中，不允许执行命令"
-                    }
-                    return jsonify(response)
-
-            authorized_devices = config.get("authorizedDevices", [])
-            authorized = any(device.get("deviceId") == device_id for device in authorized_devices)
-
-            if not authorized:
-                # 当设备未被授权且不在黑名单时，弹出窗口
-                def handle_alert():
-                    result_queue = queue.Queue()
-                    alert_thread = threading.Thread(target=Taskbar.show_custom_alert, args=(model_id, device_id, json_data.get("command"), result_queue))
-                    alert_thread.start()
-                    alert_thread.join()  # 等待弹窗关闭
-                    choice = result_queue.get()
-                    return choice
-                
-                user_choice = handle_alert()
-                print(user_choice)
-                if user_choice == "trust":
-                    # 信任设备并加入 authorizedDevices 列表
-                    authorized_devices.append({"deviceId": device_id, "deviceName": model_id})
-                    config["authorizedDevices"] = authorized_devices
-                    with open('data/Devices.json', 'w', encoding='utf-8') as f:
-                        json.dump(config, f, ensure_ascii=False, indent=4)
-                elif user_choice == "blacklist":
-                    # 将设备加入黑名单
-                    blacklisted_devices.append({"deviceId": device_id, "deviceName": model_id})
-                    config["blacklistedDevices"] = blacklisted_devices
-                    with open('data/Devices.json', 'w', encoding='utf-8') as f:
-                        json.dump(config, f, ensure_ascii=False, indent=4)
-                elif user_choice == "reject":
-                    # 设备请求被拒绝
-                    response = {
-                        "title": "命令返回状态",
-                        "execution_time": current_time,
-                        "success": False,
-                        "cmd_back": "设备未授权，不允许执行命令"
-                    }
-                    return jsonify(response)
-                elif user_choice == "allow_once":
-                    # 同意一次，仅执行这次命令
-                    pass
-
-        # 执行命令的原有逻辑
         if json_data.get("name") == "han han":
             data_command = json_data.get("command")
-            # 检测命令是否有用上 app 文件夹中的任意程序
             app_files = os.listdir(f"{server_lujin}{os.sep}app")
-            print(app_files)
             for file in app_files:
                 if file in data_command:
                     absolute_path = os.path.join(f"{server_lujin}//app", file)
                     data_command = data_command.replace(file, absolute_path)
                     print("【控制台】发现命令的程序存在于[app/目录]中，将强行使用 [app/目录]中的程序作为程序源")
 
-            print("data 值:", data_command)
             if json_data.get("value") is not None:
                 data_value = json_data.get("value")
-                print("value 值:", data_value)
-
                 def data_intstat(data_command, data_value):
                     if "nircmd.exe setsysvolume" in data_command:
                         volume = int(data_value)
-                        converted_value = int(volume * 655.35)  # 将 1-100 映射到 0-65535
-                        print(f"检测到是 nircmd.exe setsysvolume {volume}【音量调节命令】并格式化数值为 {converted_value}")
+                        converted_value = int(volume * 655.35)
                         data_command = data_command.replace('{value}', str(converted_value))
-                        print(data_command)
                         return data_command
                     else:
                         formatted_command = data_command.replace('{value}', str(data_value))
                         return formatted_command
-
                 data_command = data_intstat(data_command, data_value)
-                print(f"【控制台】最终执行命令：{data_command}")
-
-            # 执行命令 【自定义命令】 的逻辑
+            
             try:
                 output = subprocess.check_output(data_command, shell=True, stderr=subprocess.STDOUT, universal_newlines=True)
-                print("命令执行结果:", output)
                 cmd_back = output
             except subprocess.CalledProcessError as e:
-                print("命令执行出错:", e.output)
                 cmd_back = e.output
             if cmd_back == '':
                 cmd_back = "命令成功发出\n返回结果为空"

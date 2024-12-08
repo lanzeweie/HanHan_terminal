@@ -2,13 +2,32 @@
 import json
 import os
 import subprocess
+import threading
 import tkinter as tk
+import webbrowser  # 添加此行
 import winreg
 from tkinter import messagebox  # 确保导入了Toplevel
 
 import pystray
 from PIL import Image
 
+from update import VersionChecker
+
+
+def center_window(window, window_width, window_height, icon_path="data/zhou.png"):
+    # 居中创建tk 窗口
+    screen_width = window.winfo_screenwidth()
+    screen_height = window.winfo_screenheight()
+    x = (screen_width - window_width) // 2
+    y = (screen_height - window_height) // 2
+    window.geometry(f"{window_width}x{window_height}+{x}+{y}")
+
+    # 设置窗口图标
+    try:
+        icon = tk.PhotoImage(file=icon_path)
+        window.iconphoto(False, icon)
+    except tk.TclError:
+        print("图标文件加载失败，确保路径正确且文件存在。")
 
 class Taskbar():
     def __init__(self,server_lujin,app_name,app_file,ipv4_ip,port):
@@ -39,6 +58,8 @@ class Taskbar():
         command_AudioBrightnes_menu = pystray.MenuItem(Taskbar.command_AudioBrightnes_menu_name(self.app_name,self.server_lujin), lambda item: Taskbar.command_AudioBrightnes_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
         # 仅授权设备
         command_Devices_menu = pystray.MenuItem(Taskbar.command_devices_menu_name(self.app_name,self.server_lujin), lambda item: Taskbar.command_devices_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
+        # 添加检查更新菜单项
+        check_update_menu = pystray.MenuItem(f"检查更新(v{VersionChecker().CURRENT_VERSION})", lambda item: threading.Thread(target=Taskbar.check_for_updates).start())
 
         menu = (
             name_menu,
@@ -47,6 +68,8 @@ class Taskbar():
             command_AudioBrightnes_menu,
             command_bootup_menu,
             open_catalogue_menu,
+            pystray.Menu.SEPARATOR,  # 添加分隔符
+            check_update_menu,  # 添加此行
             command_exit_menu,
         )
         #声明 global serve_windows_mix_icon 是全局变量
@@ -54,7 +77,49 @@ class Taskbar():
         global serve_windows_mix_icon
         serve_windows_mix_icon = pystray.Icon("name", image, f"终端服务\n地址：{self.ipv4_ip}\n已激活服务，端口：{self.port}/{self.port+1}", menu)
         serve_windows_mix_icon.run()
-        
+
+    @staticmethod
+    def check_for_updates():
+        from update import VersionChecker
+        checker = VersionChecker()
+        if not checker.check_for_updates():
+            Taskbar.show_update_links()
+        else:
+            window = tk.Tk()
+            window.title("版本检查")
+            window_width = 240
+            window_height = 40
+            center_window(window, window_width, window_height)
+            label = tk.Label(window, text="当前已是最新版本")
+            label.pack(pady=10)
+            window.mainloop()
+
+    def show_update_links():
+        def open_github():
+            webbrowser.open("https://github.com/lanzeweie/HanHan_terminal/releases")
+
+        def open_gitee():
+            webbrowser.open("https://gitee.com/buxiangqumingzi/han-han_terminal/releases")
+
+        def open_lanzou():
+            webbrowser.open("https://wwpp.lanzouv.com/b0foy1bkb")
+
+        window = tk.Tk()
+        window.title("版本检查")
+        window_width = 400
+        window_height = 200
+        center_window(window, window_width, window_height)
+        label = tk.Label(window, text="发现新版本，请选择下载链接：")
+        label.pack(pady=10)
+        button_style = {"font": ("Helvetica", 12), "bg": "#007AFF", "fg": "white", "relief": "flat", "bd": 0}
+        button_github = tk.Button(window, text="GitHub", command=open_github, **button_style)
+        button_github.pack(pady=5)
+        button_gitee = tk.Button(window, text="Gitee", command=open_gitee, **button_style)
+        button_gitee.pack(pady=5)
+        button_lanzou = tk.Button(window, text="蓝奏云", command=open_lanzou, **button_style)
+        button_lanzou.pack(pady=5)
+        window.mainloop()
+
     #更新小任务图标的文字信息
     def icon_dongtai(self,ipv4_ip,port):
         serve_windows_mix_icon.title = f"终端服务\n地址：{ipv4_ip}\n已激活服务，端口：{port}/{port+1}"
@@ -107,31 +172,36 @@ class Taskbar():
         title = data[0]['title']
         return title
     
-    def shebei_name_xiugai(app_name, server_lujin,app_file):
-        def get_input():
-            user_input = entry.get()
-            if user_input.strip() == "":
-                messagebox.showinfo("涵涵的控制终端", "不能输入空值")
-            else:
-                with open(f'{server_lujin}/data/orderlist.json', 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                data[0]['title'] = f"{user_input}"
-                with open(f'{server_lujin}/data/orderlist.json', 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-                messagebox.showinfo("涵涵的控制终端", "设备名已修改成功！")
-                window.destroy()
-
-        window = tk.Tk()
-        window.title("涵涵的控制终端")
-        window.geometry("400x300")  # 设置窗口大小为400x300像素
-        label = tk.Label(window, text="请输入新的设备名：")
-        label.pack()
-        entry = tk.Entry(window)
-        entry.pack()
-        button = tk.Button(window, text="确定", command=get_input)
-        button.pack()
-        window.mainloop()
-        Taskbar.meun_dongtai(app_name, server_lujin,app_file)
+    def shebei_name_xiugai(app_name, server_lujin, app_file):
+        def create_window():
+            def get_input():
+                user_input = entry.get()
+                if user_input.strip() == "":
+                    messagebox.showinfo("涵涵的控制终端", "不能输入空值")
+                else:
+                    with open(f'{server_lujin}/data/orderlist.json', 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    data[0]['title'] = f"{user_input}"
+                    with open(f'{server_lujin}/data/orderlist.json', 'w', encoding='utf-8') as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    messagebox.showinfo("涵涵的控制终端", "设备名已修改成功！")
+                    window.destroy()
+                    Taskbar.meun_dongtai(app_name, server_lujin, app_file)  # 这里调用
+            window = tk.Tk()
+            window.title("涵涵的控制终端")
+            window_width, window_height = 260, 120
+            center_window(window, window_width, window_height)
+            label = tk.Label(window, text="请输入新的设备名：")
+            label.pack(pady=10)
+            entry = tk.Entry(window)
+            entry.pack(pady=10)
+            entry.focus_set()
+            button = tk.Button(window, text="确定", command=get_input)
+            button.pack(pady=10)
+            window.mainloop()
+    
+        thread = threading.Thread(target=create_window)
+        thread.start()
 
     #--------------------------------------------设置开机启动-------------------------------------------------------------
     def command_bootup_menu_name(app_name):
@@ -267,6 +337,7 @@ class Taskbar():
         root.withdraw()  # 隐藏主窗口
         alert_window = tk.Toplevel(root)
         alert_window.title("陌生设备发起请求")
+        alert_window.attributes("-topmost", True)
         # 设置窗口图标
         try:
             icon = tk.PhotoImage(file="data/zhou.png")
@@ -274,14 +345,11 @@ class Taskbar():
         except tk.TclError:
             print("图标文件加载失败，确保路径正确且文件存在。")
             
-        window_width = 300
+        window_width = 335
         window_height = 200
-        screen_width = alert_window.winfo_screenwidth()
-        screen_height = alert_window.winfo_screenheight()
-        position_top = int(screen_height / 2 - window_height / 2)
-        position_right = int(screen_width / 2 - window_width / 2)
-        alert_window.geometry(f'{window_width}x{window_height}+{position_right}+{position_top}')
-
+        center_window(alert_window, window_width, window_height)
+        if command == None:
+            command = "发起获得远程使用命令授权请求"
         label_info = tk.Label(alert_window, text=f"设备型号: {model_id}\n设备ID: {device_id}\n请求命令: {command}",
                             font=("Helvetica", 13), pady=10)
         label_info.pack()

@@ -1,11 +1,18 @@
 #调用 Windows PowerShell
+import datetime
 import json
 import os
+import queue
 import socket
 import subprocess
 import sys
+import threading
 import time
 from tkinter import messagebox
+
+from flask import jsonify, request
+
+from WinTaskbar import Taskbar
 
 ############################
 #配置文件
@@ -161,5 +168,104 @@ class PPowerShell():
         else:
             return None
 
+    def verify_device(json_data, device_lock):
+        client_ip = request.remote_addr
+        current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with open(f'{server_lujin}{os.sep}data{os.sep}Devices.json', 'r', encoding='utf-8') as file:
+            config = json.load(file)
+        enable = config.get("enable", "false").lower() == "true"
+
+        if not enable:
+            return True
+
+        device_id = json_data.get('deviceID')
+        model_id = json_data.get('modelID')
+
+        blacklisted_devices = config.get("blacklistedDevices", [])
+        for device in blacklisted_devices:
+            if device.get("deviceId") == device_id:
+                response = {
+                    "title": "命令返回状态",
+                    "execution_time": current_time,
+                    "success": False,
+                    "cmd_back": "设备在黑名单中，不允许执行命令"
+                }
+                return jsonify(response)
+
+        authorized_devices = config.get("authorizedDevices", [])
+        authorized = any(device.get("deviceId") == device_id for device in authorized_devices)
+
+        if not authorized:
+            if not device_lock.acquire(blocking=False):
+                response = {
+                    "title": "命令返回状态",
+                    "execution_time": current_time,
+                    "success": False,
+                    "cmd_back": "系统正忙，请稍后再试"
+                }
+                return jsonify(response)
+
+            try:
+                result_queue = queue.Queue()
+                alert_thread = threading.Thread(target=Taskbar.show_custom_alert, args=(model_id, device_id, json_data.get("command"), result_queue))
+                alert_thread.start()
+                alert_thread.join(timeout=15)
+
+                if alert_thread.is_alive():
+                    response = {
+                        "title": "命令返回状态",
+                        "execution_time": current_time,
+                        "success": False,
+                        "cmd_back": "设备授权超时，不允许执行命令"
+                    }
+                    return jsonify(response)
+                else:
+                    choice = result_queue.get()
+                    if choice == "trust":
+                        authorized_devices.append({"deviceId": device_id, "deviceName": model_id})
+                        config["authorizedDevices"] = authorized_devices
+                        with open('data/Devices.json', 'w', encoding='utf-8') as f:
+                            json.dump(config, f, ensure_ascii=False, indent=4)
+                    elif choice == "blacklist":
+                        blacklisted_devices.append({"deviceId": device_id, "deviceName": model_id})
+                        config["blacklistedDevices"] = blacklisted_devices
+                        with open('data/Devices.json', 'w', encoding='utf-8') as f:
+                            json.dump(config, f, ensure_ascii=False, indent=4)
+                        response = {
+                            "title": "命令返回状态",
+                            "execution_time": current_time,
+                            "success": False,
+                            "cmd_back": "设备已加入黑名单，不允许执行命令"
+                        }
+                        return jsonify(response)
+                    elif choice == "reject":
+                        response = {
+                            "title": "命令返回状态",
+                            "execution_time": current_time,
+                            "success": False,
+                            "cmd_back": "设备未授权，不允许执行命令"
+                        }
+                        return jsonify(response)
+                    elif choice == "allow_once":
+                        return True
+
+                authorized_devices = config.get("authorizedDevices", [])
+                authorized = any(device.get("deviceId") == device_id for device in authorized_devices)
+                if authorized:
+                    return True
+                else:
+                    response = {
+                        "title": "命令返回状态",
+                        "execution_time": current_time,
+                        "success": False,
+                        "cmd_back": "设备未授权，不允许执行命令"
+                    }
+                    return jsonify(response)
+            finally:
+                device_lock.release()
+        else:
+            return True
+
+        
 if __name__ == "__main__":
     print(PPowerShell.file_json_Audio())
