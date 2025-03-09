@@ -10,7 +10,17 @@ import sys
 import threading
 import time
 import tkinter as tk  # 添加tkinter导入
+# 添加音量控制所需的库
+from ctypes import POINTER, cast
 from tkinter import messagebox
+
+import comtypes
+
+try:
+    from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+    PYCAW_AVAILABLE = True
+except ImportError:
+    PYCAW_AVAILABLE = False
 
 from flask import jsonify, request
 
@@ -40,9 +50,10 @@ class PPowerShell():
 
     def file_json_Audio():
         need_update = False
+        ''' 
         with open(f'{server_lujin}{os.sep}{config_orderlist}', 'r', encoding='utf-8') as file:
-            data = json.load(file)
-            
+        data = json.load(file)
+        
         for item in data:
             if item['title'] == '音量控制':
                 Audio_value = PPowerShell.ps1_get('AudioVolume')
@@ -70,6 +81,7 @@ class PPowerShell():
             with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
                 json.dump(data, file, indent=2, ensure_ascii=False)
             print("配置文件已更新音量和亮度值")
+        ''' 
 
     def file_json_geshihua(ipv4,port):
         #格式化data json数据，设置为当机地址
@@ -297,7 +309,7 @@ class PPowerShell():
                 Taskbar_start.icon_dongtai(current_address,port)
                 #首先检查是否有 “音量控制、亮度控制” json配置信息，如果有则调用 Windows PowerShell 来查询数值并更新到配置文件中
             PPowerShell.file_json_Audio()
-            time.sleep(60)
+            time.sleep(1)
 
     @staticmethod
     async def check_ipv4_Dynamic_state_async(port, taskbar_instance, loop):
@@ -439,6 +451,44 @@ class PPowerShell():
         else:
             return True
 
+    # 添加音量控制功能
+    @staticmethod
+    def control_system_volume(volume_percent):
+        """
+        通过pycaw设置系统音量
+        :param volume_percent: 音量百分比，范围0-100
+        :return: 成功返回True和当前音量，失败返回False和错误信息
+        """
+        if not PYCAW_AVAILABLE:
+            return False, "pycaw库未安装，无法控制音量"
+            
+        try:
+            # 初始化COM组件
+            comtypes.CoInitialize()
+            
+            # 获取系统音频设备
+            devices = AudioUtilities.GetSpeakers()
+            interface = devices.Activate(IAudioEndpointVolume._iid_, 0, None)
+            volume = cast(interface, POINTER(IAudioEndpointVolume))
+            
+            # 将百分比转换为0-1之间的值
+            target_volume = max(0, min(100, volume_percent)) / 100.0
+            
+            # 设置音量
+            volume.SetMasterVolumeLevelScalar(target_volume, None)
+            
+            # 读取当前音量确认
+            current_volume = volume.GetMasterVolumeLevelScalar()
+            current_percent = int(current_volume * 100)
+            
+            # 返回成功和当前音量
+            return True, f"已设置音量至: {current_percent}%"
+            
+        except Exception as e:
+            return False, f"设置音量失败: {str(e)}"
+        finally:
+            # 确保关闭COM组件
+            comtypes.CoUninitialize()
         
 if __name__ == "__main__":
     print(PPowerShell.file_json_Audio())

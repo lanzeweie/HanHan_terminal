@@ -147,19 +147,30 @@ class flask_api_web():
             if json_data.get("value") is not None:
                 data_value = json_data.get("value")
                 def data_intstat(data_command, data_value):
-                    if "nircmd.exe setsysvolume" in data_command:
+                    # 检测是否是音量控制命令
+                    if data_command == "setsysvolume {value}" or "nircmd.exe setsysvolume" in data_command:
+                        # 直接使用WinDC.py中的音量控制功能
                         volume = int(data_value)
-                        converted_value = int(volume * 655.35)
-                        data_command = data_command.replace('{value}', str(converted_value))
-                        return data_command
+                        success, message = PPowerShell.control_system_volume(volume)
+                        if success:
+                            return "python_volume_control_success"  # 特殊标记，表示已通过Python处理
+                        else:
+                            print(f"Python音量控制出现问题: {message}")
+                            return "python_volume_control_failed"  # 标记音量控制失败
                     else:
                         formatted_command = data_command.replace('{value}', str(data_value))
                         return formatted_command
                 data_command = data_intstat(data_command, data_value)
             
             try:
-                output = subprocess.check_output(data_command, shell=True, stderr=subprocess.STDOUT, universal_newlines=True)
-                cmd_back = output
+                # 检查是否已通过Python处理音量
+                if data_command == "python_volume_control_success":
+                    cmd_back = "成功修改为{}%".format(data_value)
+                elif data_command == "python_volume_control_failed":
+                    cmd_back = "设置系统音量失败"
+                else:
+                    output = subprocess.check_output(data_command, shell=True, stderr=subprocess.STDOUT, universal_newlines=True)
+                    cmd_back = output
             except subprocess.CalledProcessError as e:
                 cmd_back = e.output
             if cmd_back == '':
