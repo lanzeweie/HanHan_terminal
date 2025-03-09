@@ -39,30 +39,38 @@ class PPowerShell():
         pass
 
     def file_json_Audio():
+        need_update = False
         with open(f'{server_lujin}{os.sep}{config_orderlist}', 'r', encoding='utf-8') as file:
             data = json.load(file)
+            
         for item in data:
             if item['title'] == '音量控制':
                 Audio_value = PPowerShell.ps1_get('AudioVolume')
                 if Audio_value is not None:
                     Audio_value_True = float(Audio_value) * 100
                     item['value'] = int(Audio_value_True)
-                    with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
-                        json.dump(data, file, indent=2, ensure_ascii=False)
-            if item['title'] == '亮度控制':
+                    need_update = True
+            elif item['title'] == '亮度控制':
                 Audio_value = PPowerShell.ps1_get('AudioBrightnes')
-                try:
-                    if Audio_value is not None:
+                if Audio_value is not None:
+                    try:
                         Audio_value_True = Audio_value
                         item['value'] = int(Audio_value_True)
-                        with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
-                            json.dump(data, file, indent=2, ensure_ascii=False)      
-                except:
-                    if Audio_value is not None:
-                        Audio_value_True = Audio_value[0]
-                        item['value'] = int(Audio_value_True)
-                        with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
-                            json.dump(data, file, indent=2, ensure_ascii=False)   
+                        need_update = True
+                    except:
+                        try:
+                            Audio_value_True = Audio_value[0]
+                            item['value'] = int(Audio_value_True)
+                            need_update = True
+                        except:
+                            print("亮度值转换失败")
+        
+        # 只有在需要更新时才写入文件
+        if need_update:
+            with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
+                json.dump(data, file, indent=2, ensure_ascii=False)
+            print("配置文件已更新音量和亮度值")
+
     def file_json_geshihua(ipv4,port):
         #格式化data json数据，设置为当机地址
         #----------历史屎坑--------如果去除它则无法运行
@@ -100,7 +108,6 @@ class PPowerShell():
         with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
             json.dump(data, file, indent=2, ensure_ascii=False)
         print("配置文件更新完成")
-
     def check_files_and_dirs(app_name, app_file):
         files_and_dirs = [f"{server_lujin}/data"]
         for item in files_and_dirs:  
@@ -111,7 +118,6 @@ class PPowerShell():
                 messagebox.showinfo("涵涵的控制终端核心", f"缺失{item}")  
                 os._exit(1)  # 添加退出代码
         print("\n环境已检查：正常")
-
         # 是否第一次启动 设置第一次启动自行开启开机启动
         if os.path.exists(f"{server_lujin}/data/one"):
             pass
@@ -120,115 +126,118 @@ class PPowerShell():
                 pass
             Taskbar.command_bootup_menu_add_to_startup(app_name, f"{server_lujin}{os.sep}{app_file}")
         print(f"{server_lujin}{os.sep}{app_file}")
-
         # 检查是否需要设置设备名
-        try:
-            with open(f"{server_lujin}/data/id.json", "r", encoding='utf-8') as file:
-                data = json.load(file)
-            
-            if data.get('name', '') == '':
-                def create_device_name_window():
-                    def save_device_name():
-                        user_input = entry.get().strip()
-                        if not user_input:
-                            messagebox.showinfo("涵涵的控制终端", "设备名不能为空，请重新输入")
-                            return
+        with open(f"{server_lujin}/data/id.json", "r", encoding='utf-8') as file:
+            data = json.load(file)
+
+        if data.get('name', '') == '':
+            # 使用单线程方式处理设备名设置
+            def create_device_name_window():
+                def save_device_name():
+                    user_input = entry.get().strip()
+                    if not user_input:
+                        messagebox.showinfo("涵涵的控制终端", "设备名不能为空，请重新输入")
+                        return
+                    
+                    try:
+                        # 修改 id.json
+                        with open(f'{server_lujin}/data/id.json', 'r', encoding='utf-8') as id_file:
+                            id_data = json.load(id_file)
+                        id_data['name'] = user_input
+                        with open(f'{server_lujin}/data/id.json', 'w', encoding='utf-8') as id_file:
+                            json.dump(id_data, id_file, indent=2, ensure_ascii=False)
                         
+                        # 修改 orderlist.json
                         try:
-                            # 修改 id.json
-                            with open(f'{server_lujin}/data/id.json', 'r', encoding='utf-8') as id_file:
-                                id_data = json.load(id_file)
-                            id_data['name'] = user_input
-                            with open(f'{server_lujin}/data/id.json', 'w', encoding='utf-8') as id_file:
-                                json.dump(id_data, id_file, indent=2, ensure_ascii=False)
-                            
-                            # 修改 orderlist.json
+                            with open(f'{server_lujin}/data/orderlist.json', 'r', encoding='utf-8') as f:
+                                orderlist_data = json.load(f)
+                            # 添加 try 是为了让 orderlist 中显示设备名 
                             try:
-                                with open(f'{server_lujin}/data/orderlist.json', 'r', encoding='utf-8') as f:
-                                    data = json.load(f)
-                                # 添加 try 是为了让 orderlist 中显示设备名 可以不存在 因为新版本添加了 id.json 专门用来储存设备名  用户可以选择去除 orderlist 当然，默认是存在的
-                                try:
-                                    if data[0]['//1'] != '以上是标题,可以在任务栏中修改':
-                                        data[0]['title'] = f"{user_input}"
-                                        with open(f'{server_lujin}/data/orderlist.json', 'w', encoding='utf-8') as f:
-                                            json.dump(data, f, indent=2, ensure_ascii=False)
-                                except:
-                                    pass
-                            except Exception as e:
-                                print(f"更新orderlist.json时出错: {str(e)}")
-                                # 错误可以忽略，因为orderlist.json是可选的
-                            
-                            messagebox.showinfo("涵涵的控制终端", "设备名设置成功！")
-                            window.destroy()
-                            Taskbar.meun_dongtai(app_name, server_lujin, app_file)
+                                if orderlist_data[0]['//1'] != '以上是标题,可以在任务栏中修改':
+                                    orderlist_data[0]['title'] = f"{user_input}"
+                                    with open(f'{server_lujin}/data/orderlist.json', 'w', encoding='utf-8') as f:
+                                        json.dump(orderlist_data, f, indent=2, ensure_ascii=False)
+                            except:
+                                pass
                         except Exception as e:
-                            messagebox.showerror("涵涵的控制终端", f"保存设备名时出错: {str(e)}")
-                    
-                    window = tk.Tk()
-                    window.title("涵涵的控制终端")
-                    window_width, window_height = 350, 180
-                    center_window(window, window_width, window_height)
-                    window.configure(bg="#f0f0f0")
-                    
-                    # 创建一个主框架来容纳所有控件
-                    main_frame = tk.Frame(window, bg="#f0f0f0", padx=20, pady=20)
-                    main_frame.pack(fill=tk.BOTH, expand=True)
-                    
-                    # 欢迎文本
-                    welcome_label = tk.Label(
-                        main_frame, 
-                        text="欢迎使用小涵的软件，请为你的设备取个名字吧~",
-                        font=("微软雅黑", 10),
-                        wraplength=300,
-                        bg="#f0f0f0"
-                    )
-                    welcome_label.pack(pady=(0, 15))
-                    
-                    # 输入框
-                    entry_frame = tk.Frame(main_frame, bg="#f0f0f0")
-                    entry_frame.pack(fill=tk.X, pady=5)
-                    
-                    entry = tk.Entry(entry_frame, font=("微软雅黑", 10), width=30)
-                    entry.pack(pady=5)
-                    entry.focus_set()
-                    
-                    # 确定按钮
-                    button_frame = tk.Frame(main_frame, bg="#f0f0f0")
-                    button_frame.pack(pady=10)
-                    
-                    button = tk.Button(
-                        button_frame, 
-                        text="确定", 
-                        command=save_device_name,
-                        width=10,
-                        bg="#4CAF50",
-                        fg="white",
-                        relief=tk.FLAT,
-                        font=("微软雅黑", 9)
-                    )
-                    button.pack(pady=5)
-                    
-                    # 绑定回车键
-                    window.bind('<Return>', lambda event: save_device_name())
-                    
-                    window.mainloop()
+                            print(f"更新orderlist.json时出错: {str(e)}")
+                            # 错误可以忽略，因为orderlist.json是可选的
+                        
+                        messagebox.showinfo("涵涵的控制终端", "设备名设置成功！")
+                        window.destroy()
+                        # 设置一个标志，指示已完成设置
+                        window.device_name_set = True
+                    except Exception as e:
+                        messagebox.showerror("涵涵的控制终端", f"保存设备名时出错: {str(e)}")
                 
-                # 启动设备名设置窗口
-                thread = threading.Thread(target=create_device_name_window)
-                thread.start()
-        except Exception as e:
-            print(f"检查设备名时出错: {str(e)}")
-            # 如果id.json文件不存在或格式不正确，创建一个新的
-            
+                window = tk.Tk()
+                window.title("涵涵的控制终端")
+                window_width, window_height = 350, 180
+                center_window(window, window_width, window_height)
+                window.configure(bg="#f0f0f0")
+                # 设置标志属性
+                window.device_name_set = False
+                # 设置窗口图标
+                try:
+                    icon_path = f"{server_lujin}{os.sep}data{os.sep}zhou.png"
+                    if os.path.exists(icon_path):
+                        icon_image = tk.PhotoImage(file=icon_path)
+                        window.iconphoto(True, icon_image)
+                except Exception as e:
+                    print(f"设置窗口图标时出错: {str(e)}")
+                # 创建一个主框架来容纳所有控件
+                main_frame = tk.Frame(window, bg="#f0f0f0", padx=20, pady=20)
+                main_frame.pack(fill=tk.BOTH, expand=True)
+                # 欢迎文本
+                welcome_label = tk.Label(
+                    main_frame, 
+                    text="欢迎使用小涵的软件，请为你的设备取个名字吧~",
+                    font=("微软雅黑", 10),
+                    wraplength=300,
+                )
+                welcome_label.pack(pady=(0, 15))
+                # 输入框
+                entry_frame = tk.Frame(main_frame, bg="#f0f0f0")
+                entry_frame.pack(fill=tk.X, pady=5)
+                entry = tk.Entry(entry_frame, font=("微软雅黑", 10), width=30)
+                entry.pack(pady=5)
+                entry.focus_set()
+                # 确定按钮
+                button_frame = tk.Frame(main_frame, bg="#f0f0f0")
+                button_frame.pack(pady=10)
+                button = tk.Button(
+                    button_frame, 
+                    text="确定", 
+                    command=save_device_name,
+                    width=10,
+                    bg="#282c34",
+                    fg="white",
+                    relief=tk.FLAT,
+                    font=("微软雅黑", 9)
+                )
+                button.pack(pady=5)
+                # 绑定回车键
+                window.bind('<Return>', lambda event: save_device_name())
+                # 阻塞主线程直到窗口关闭
+                window.mainloop()
+                # 窗口关闭后，返回设置状态
+                return window.device_name_set
+            # 执行设备名设置窗口并获取结果
+            device_name_set = create_device_name_window()
+            # 设置完成后，再次检查设备名是否已成功设置
             try:
-                os.makedirs(f"{server_lujin}/data", exist_ok=True)
-                with open(f"{server_lujin}/data/id.json", "w", encoding='utf-8') as file:
-                    json.dump({"name": ""}, file, indent=2, ensure_ascii=False)
-                # 重新调用此函数
-                PPowerShell.check_files_and_dirs(app_name, app_file)
-            except Exception as create_error:
-                print(f"创建id.json文件时出错: {str(create_error)}")
-                messagebox.showerror("涵涵的控制终端", "配置文件创建失败，请检查程序权限")
+                with open(f"{server_lujin}/data/id.json", "r", encoding='utf-8') as file:
+                    data = json.load(file)
+                
+                if data.get('name', '') == '':
+                    print("设备名设置失败或被取消")
+                    # 可以决定是否继续程序执行或退出
+                    os._exit(1)  # 如果需要强制退出，可以取消此注释
+                else:
+                    print(f"设备名已成功设置为: {data['name']}")
+                    Taskbar.meun_dongtai(app_name, server_lujin, app_file)
+            except Exception as e:
+                print(f"检查设备名设置状态时出错: {str(e)}")
 
     #--------------------------------屎坑 删除则无法运行 不知道作用-----------------------
     def get_ipv4_address():  
