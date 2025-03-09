@@ -1,4 +1,5 @@
 #调用 Windows PowerShell
+import asyncio  # 添加asyncio导入
 import datetime
 import json
 import os
@@ -8,11 +9,21 @@ import subprocess
 import sys
 import threading
 import time
+import tkinter as tk  # 添加tkinter导入
 from tkinter import messagebox
 
 from flask import jsonify, request
 
 from WinTaskbar import Taskbar
+
+
+def center_window(window, width, height):
+    """将窗口居中显示"""
+    screen_width = window.winfo_screenwidth()
+    screen_height = window.winfo_screenheight()
+    x_coordinate = (screen_width - width) // 2
+    y_coordinate = (screen_height - height) // 2
+    window.geometry(f"{width}x{height}+{x_coordinate}+{y_coordinate}")
 
 ############################
 #配置文件
@@ -53,7 +64,7 @@ class PPowerShell():
                         with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
                             json.dump(data, file, indent=2, ensure_ascii=False)   
     def file_json_geshihua(ipv4,port):
-        #格式化dataj json数据，设置为当机地址
+        #格式化data json数据，设置为当机地址
         #----------历史屎坑--------如果去除它则无法运行
         PPowerShell.get_ipv4_address()
         #----------历史屎坑--------如果去除它则无法运行
@@ -71,7 +82,26 @@ class PPowerShell():
             json.dump(data, file, indent=2, ensure_ascii=False)
         print("读取了配置文件")
 
-    def check_files_and_dirs():
+    def file_json_geshihua_prot(port):
+         #格式化data json数据，设置为启动端口
+        with open(f'{server_lujin}{os.sep}{config_orderlist}', 'r', encoding='utf-8') as file:
+            data = json.load(file)
+        for item in data:
+            if item['guding'] == 'n':
+                url = item['apiUrl']
+                target = '*hanhanip*:'
+                if target in url:
+                    start_index = url.find(target) + len(target)
+                    end_index = url.find('/', start_index)
+                    if end_index == -1:
+                        end_index = len(url)
+                    new_url = url[:start_index] + f"{port+1}" + url[end_index:]
+                    item['apiUrl'] = new_url
+        with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
+            json.dump(data, file, indent=2, ensure_ascii=False)
+        print("配置文件更新完成")
+
+    def check_files_and_dirs(app_name, app_file):
         files_and_dirs = [f"{server_lujin}/data"]
         for item in files_and_dirs:  
             if os.path.exists(item):  
@@ -79,9 +109,126 @@ class PPowerShell():
             else:  
                 print(f"缺失{item}")
                 messagebox.showinfo("涵涵的控制终端核心", f"缺失{item}")  
-                os._exit()
+                os._exit(1)  # 添加退出代码
         print("\n环境已检查：正常")
 
+        # 是否第一次启动 设置第一次启动自行开启开机启动
+        if os.path.exists(f"{server_lujin}/data/one"):
+            pass
+        else:
+            with open(f"{server_lujin}/data/one", "w") as file:
+                pass
+            Taskbar.command_bootup_menu_add_to_startup(app_name, f"{server_lujin}{os.sep}{app_file}")
+        print(f"{server_lujin}{os.sep}{app_file}")
+
+        # 检查是否需要设置设备名
+        try:
+            with open(f"{server_lujin}/data/id.json", "r", encoding='utf-8') as file:
+                data = json.load(file)
+            
+            if data.get('name', '') == '':
+                def create_device_name_window():
+                    def save_device_name():
+                        user_input = entry.get().strip()
+                        if not user_input:
+                            messagebox.showinfo("涵涵的控制终端", "设备名不能为空，请重新输入")
+                            return
+                        
+                        try:
+                            # 修改 id.json
+                            with open(f'{server_lujin}/data/id.json', 'r', encoding='utf-8') as id_file:
+                                id_data = json.load(id_file)
+                            id_data['name'] = user_input
+                            with open(f'{server_lujin}/data/id.json', 'w', encoding='utf-8') as id_file:
+                                json.dump(id_data, id_file, indent=2, ensure_ascii=False)
+                            
+                            # 修改 orderlist.json
+                            try:
+                                with open(f'{server_lujin}/data/orderlist.json', 'r', encoding='utf-8') as f:
+                                    data = json.load(f)
+                                # 添加 try 是为了让 orderlist 中显示设备名 可以不存在 因为新版本添加了 id.json 专门用来储存设备名  用户可以选择去除 orderlist 当然，默认是存在的
+                                try:
+                                    if data[0]['//1'] != '以上是标题,可以在任务栏中修改':
+                                        data[0]['title'] = f"{user_input}"
+                                        with open(f'{server_lujin}/data/orderlist.json', 'w', encoding='utf-8') as f:
+                                            json.dump(data, f, indent=2, ensure_ascii=False)
+                                except:
+                                    pass
+                            except Exception as e:
+                                print(f"更新orderlist.json时出错: {str(e)}")
+                                # 错误可以忽略，因为orderlist.json是可选的
+                            
+                            messagebox.showinfo("涵涵的控制终端", "设备名设置成功！")
+                            window.destroy()
+                            Taskbar.meun_dongtai(app_name, server_lujin, app_file)
+                        except Exception as e:
+                            messagebox.showerror("涵涵的控制终端", f"保存设备名时出错: {str(e)}")
+                    
+                    window = tk.Tk()
+                    window.title("涵涵的控制终端")
+                    window_width, window_height = 350, 180
+                    center_window(window, window_width, window_height)
+                    window.configure(bg="#f0f0f0")
+                    
+                    # 创建一个主框架来容纳所有控件
+                    main_frame = tk.Frame(window, bg="#f0f0f0", padx=20, pady=20)
+                    main_frame.pack(fill=tk.BOTH, expand=True)
+                    
+                    # 欢迎文本
+                    welcome_label = tk.Label(
+                        main_frame, 
+                        text="欢迎使用小涵的软件，请为你的设备取个名字吧~",
+                        font=("微软雅黑", 10),
+                        wraplength=300,
+                        bg="#f0f0f0"
+                    )
+                    welcome_label.pack(pady=(0, 15))
+                    
+                    # 输入框
+                    entry_frame = tk.Frame(main_frame, bg="#f0f0f0")
+                    entry_frame.pack(fill=tk.X, pady=5)
+                    
+                    entry = tk.Entry(entry_frame, font=("微软雅黑", 10), width=30)
+                    entry.pack(pady=5)
+                    entry.focus_set()
+                    
+                    # 确定按钮
+                    button_frame = tk.Frame(main_frame, bg="#f0f0f0")
+                    button_frame.pack(pady=10)
+                    
+                    button = tk.Button(
+                        button_frame, 
+                        text="确定", 
+                        command=save_device_name,
+                        width=10,
+                        bg="#4CAF50",
+                        fg="white",
+                        relief=tk.FLAT,
+                        font=("微软雅黑", 9)
+                    )
+                    button.pack(pady=5)
+                    
+                    # 绑定回车键
+                    window.bind('<Return>', lambda event: save_device_name())
+                    
+                    window.mainloop()
+                
+                # 启动设备名设置窗口
+                thread = threading.Thread(target=create_device_name_window)
+                thread.start()
+        except Exception as e:
+            print(f"检查设备名时出错: {str(e)}")
+            # 如果id.json文件不存在或格式不正确，创建一个新的
+            
+            try:
+                os.makedirs(f"{server_lujin}/data", exist_ok=True)
+                with open(f"{server_lujin}/data/id.json", "w", encoding='utf-8') as file:
+                    json.dump({"name": ""}, file, indent=2, ensure_ascii=False)
+                # 重新调用此函数
+                PPowerShell.check_files_and_dirs(app_name, app_file)
+            except Exception as create_error:
+                print(f"创建id.json文件时出错: {str(create_error)}")
+                messagebox.showerror("涵涵的控制终端", "配置文件创建失败，请检查程序权限")
 
     #--------------------------------屎坑 删除则无法运行 不知道作用-----------------------
     def get_ipv4_address():  
@@ -123,10 +270,7 @@ class PPowerShell():
     def get_ipv4_now():
         ip_address = None
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(('8.8.8.8', 80))
-            ip_address = s.getsockname()[0]
-            s.close()
+            return socket.gethostbyname(socket.gethostname())
         except socket.error:
             pass
         return ip_address
@@ -135,16 +279,36 @@ class PPowerShell():
         previous_address = None
         while True:
             current_address = PPowerShell.get_ipv4_now()
-            if current_address and current_address != previous_address:
+            if (current_address and current_address != previous_address):
                 print("IPv4 地址发生变化：", current_address)
                 previous_address = current_address
                 #更改json地址
-                PPowerShell.file_json_geshihua(current_address,port)
+                #PPowerShell.file_json_geshihua(current_address,port)
                 #更改Windows小任务栏的地址
                 Taskbar_start.icon_dongtai(current_address,port)
                 #首先检查是否有 “音量控制、亮度控制” json配置信息，如果有则调用 Windows PowerShell 来查询数值并更新到配置文件中
             PPowerShell.file_json_Audio()
-            time.sleep(20)
+            time.sleep(60)
+
+    @staticmethod
+    async def check_ipv4_Dynamic_state_async(port, taskbar_instance, loop):
+        """异步版本的IP地址变化检测函数"""
+        last_ip = PPowerShell.get_ipv4_now()
+        while True:
+            try:
+                current_ip = PPowerShell.get_ipv4_now()
+                if (current_ip != last_ip):
+                    print(f"IP地址已变更: {last_ip} -> {current_ip}")
+                    # 更新任务栏IP地址
+                    taskbar_instance.update_ip(current_ip)
+                    # 调用格式化函数更新配置
+                    PPowerShell.file_json_geshihua(current_ip, port)
+                    last_ip = current_ip
+                # 异步等待10秒
+                await asyncio.sleep(10)
+            except Exception as e:
+                print(f"IP检测异常: {str(e)}")
+                await asyncio.sleep(30)  # 出错时延长等待时间
 
     def ps1_get(name):
         ps_script_path = f"{server_lujin}{os.sep}app{os.sep}{name}.ps1"

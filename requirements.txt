@@ -3,3 +3,4 @@ flask
 waitress
 pystray
 psutil
+requests

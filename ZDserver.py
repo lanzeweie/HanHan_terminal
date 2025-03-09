@@ -1,3 +1,4 @@
+import asyncio  # 新增asyncio导入
 import datetime
 import json
 import os
@@ -59,7 +60,6 @@ class flask_api_web():
                     }
                     return jsonify(response), 401  # Unauthorized status code
 
-
     @app.route('/hello', methods=['GET'])
     def hello():
         client_ip = request.remote_addr  # 获取客户端的 IP 地址
@@ -68,7 +68,6 @@ class flask_api_web():
         print(nrong)
         with open(f"{server_lujin}{os.sep}log{os.sep}{log_file}", "a", encoding="utf-8") as f:
             f.write(nrong)
-
         response = {
             "title": "欢迎连接至终端",
             "execution_time": current_time,
@@ -76,6 +75,24 @@ class flask_api_web():
         }
         return jsonify(response)
 
+    @app.route('/name', methods=['GET'])
+    def get_name():
+        client_ip = request.remote_addr
+        current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        log_msg = f"【{current_time}】[控制台]: 设备 {client_ip} 访问name接口\n"
+        print(log_msg)
+        with open(f"{server_lujin}/log/{log_file}", "a", encoding="utf-8") as f:
+            f.write(log_msg)
+        id_path = os.path.join(server_lujin, "data", "id.json")
+        with open(id_path, "r", encoding="utf-8") as f:
+            id_data = json.load(f)
+            name = id_data.get("name", "")
+        return jsonify({
+            "title": name,
+            "execution_time": current_time,
+            "success": True
+        })
+        
     @app.route('/orderlist', methods=['POST'])
     def orderlist():
         client_ip = request.remote_addr  # 获取客户端的 IP 地址
@@ -162,10 +179,13 @@ class Basics():
     def run_socket(host, port):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            server_socket.bind((host, port))
-        except:
-            messagebox.showinfo("控制终端核心", f"Flask 服务 无法启动 \n未开放或被占用")  
-            os._exit(0)
+            server_socket.bind(('0.0.0.0', port))  # 硬编码IPv4地址避免DNS解析问题
+        except Exception as e:
+            print(f" {'端口被占用' if 'Address already in use' in str(e) else '权限不足' if '权限' in str(e) else '其他系统错误'}")
+            import traceback
+            traceback.print_exc()
+            messagebox.showinfo("控制终端核心", f"端口绑定失败: {str(e)}")  
+            os._exit(1)
         server_socket.listen(20)
         try:
             while True:
@@ -194,49 +214,49 @@ if __name__ == '__main__':
 
     host = '0.0.0.0'
     port = 5201
-    #判断是否缺失文件
-    PPowerShell.check_files_and_dirs()
-
-    #格式化文件，并实时检测ip地址是否变化，变化则根据新地址格式化文件
-
-    #-----------------------实时检测地址是否变化-----------------------
-    
-
     app_name = "涵的控制终端"
-    #是否第一次启动 设置第一次启动自行开启开机启动
-    if os.path.exists(f"{server_lujin}/data/one"):
-        pass
-    else:
-        with open(f"{server_lujin}/data/one", "w") as file:
-            pass
-        Taskbar.command_bootup_menu_add_to_startup(app_name, f"{server_lujin}{os.sep}{app_file}")
-    print(f"{server_lujin}{os.sep}{app_file}")
+    #判断是否缺失文件 也用于每次启动的初始检测
+    PPowerShell.check_files_and_dirs(app_name,app_file)
 
     #-----------------------Windows 小任务栏
     print("启动 Windows 小任务栏应用")
     Taskbar_start = Taskbar(server_lujin, app_name, app_file, PPowerShell.get_ipv4_now(), port)
-    serve_windows_mix_icon_duoxianc = threading.Thread(target=Taskbar_start.chushihua)
-    serve_windows_mix_icon_duoxianc.daemon = True
-    serve_windows_mix_icon_duoxianc.start()
+    
+    # 创建一个专用于任务栏的事件循环
+    taskbar_loop = asyncio.new_event_loop()
+    # 将任务栏初始化放入异步事件循环中运行
+    taskbar_thread = threading.Thread(
+        target=lambda: taskbar_loop.run_until_complete(Taskbar_start.chushihua_async(taskbar_loop)),
+        daemon=True
+    )
+    taskbar_thread.start()
 
     #-----------------------实时检测地址是否变化-----------------------
-    check_ipv4_Dynamic_state_duoxiancheng = threading.Thread(target=PPowerShell.check_ipv4_Dynamic_state, args=(port,Taskbar_start,))
-    check_ipv4_Dynamic_state_duoxiancheng.daemon = True
-    check_ipv4_Dynamic_state_duoxiancheng.start()
+    # 创建一个新的事件循环
+    ipv4_loop = asyncio.new_event_loop()
+    # 将IP地址检测任务放入事件循环
+    asyncio_thread = threading.Thread(
+        target=lambda: ipv4_loop.run_until_complete(PPowerShell.check_ipv4_Dynamic_state_async(port, Taskbar_start, ipv4_loop)),
+        daemon=True
+    )
+    asyncio_thread.start()
+    # 统一一下配置文件的参数
+    PPowerShell.file_json_geshihua_prot(port)
 
     #-----------------------开放检测到的端口-----------------------
+    print("正在初始化网络服务...")
     socket_thread = threading.Thread(target=Basics.run_socket, args=(host, port))
     socket_thread.daemon = True
     socket_thread.start()
+    socket_thread.join(1)  # 等待端口绑定完成
     #-----------------------开放检测到的端口-----------------------
     
     #messagebox.showinfo("涵涵的控制终端核心", f"\n涵涵的控制终端核心 已成功启动 当前地址：{host}:{port}/{port+1}")  
     try:
         print(f"\n涵涵的控制终端核心 已成功启动 当前地址：{PPowerShell.get_ipv4_now()}:{port}/{port+1}")
+        print(f"启动Flask服务在 {host}:{port+1}")
         serve(app, host=host, port=port + 1)
     except:
         print(f"Flask 服务 无法启动 端口：{port}:{port + 1} 未开放或被占用")
         messagebox.showinfo("涵涵的控制终端核心", f"Flask 服务 无法启动 端口：{port}:{port + 1} 未开放或被占用")  
         os._exit(0)
-
-    

@@ -1,4 +1,5 @@
 # Windows 的小任务栏
+import asyncio
 import json
 import os
 import subprocess
@@ -30,12 +31,24 @@ def center_window(window, window_width, window_height, icon_path="data/zhou.png"
         print("图标文件加载失败，确保路径正确且文件存在。")
 
 class Taskbar():
-    def __init__(self,server_lujin,app_name,app_file,ipv4_ip,port):
-        self.server_lujin = server_lujin
-        self.app_name = app_name
-        self.app_file = app_file
-        self.ipv4_ip = ipv4_ip
-        self.port = port
+    _instance = None
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    @classmethod
+    def get_instance(cls):
+        return cls._instance
+    def __init__(self, server_lujin, app_name, app_file, ipv4_ip, port):
+        if not hasattr(self, '_initialized'):  # 防止重复初始化
+            self.server_lujin = server_lujin
+            self.app_name = app_name
+            self.app_file = app_file
+            self.ipv4_ip = ipv4_ip
+            self.port = port
+            self.serve_windows_mix_icon = None  # 实例变量
+            self._initialized = True
 
     #初始化
     def chushihua(self):
@@ -74,9 +87,23 @@ class Taskbar():
         )
         #声明 global serve_windows_mix_icon 是全局变量
         image = Image.open(f"{self.server_lujin}/data/zhou.png")
-        global serve_windows_mix_icon
-        serve_windows_mix_icon = pystray.Icon("name", image, f"终端服务\n地址：{self.ipv4_ip}\n已激活服务，端口：{self.port}/{self.port+1}", menu)
-        serve_windows_mix_icon.run()
+        self.serve_windows_mix_icon = pystray.Icon("name", image, 
+            f"终端服务\n地址：{self.ipv4_ip}\n已激活服务，端口：{self.port}/{self.port+1}", 
+            menu)
+        self.serve_windows_mix_icon.run()
+
+    async def chushihua_async(self, loop):
+        """异步版本的初始化方法"""
+        try:
+            # 使用run_in_executor将阻塞式方法转为异步方法
+            # 第一个参数是执行器(None表示使用默认的ThreadPoolExecutor)
+            await loop.run_in_executor(None, self.chushihua)
+        except Exception as e:
+            print(f"任务栏异步初始化异常: {str(e)}")
+        
+        # 保持事件循环运行，处理未来可能的异步任务
+        while True:
+            await asyncio.sleep(3600)  # 每小时检查一次，保持循环运行
 
     @staticmethod
     def check_for_updates():
@@ -121,28 +148,40 @@ class Taskbar():
         window.mainloop()
 
     #更新小任务图标的文字信息
-    def icon_dongtai(self,ipv4_ip,port):
-        serve_windows_mix_icon.title = f"终端服务\n地址：{ipv4_ip}\n已激活服务，端口：{port}/{port+1}"
+    def icon_dongtai(self, ipv4_ip, port):
+        # 添加空值检查和异常处理
+        if self.serve_windows_mix_icon:
+            try:
+                self.serve_windows_mix_icon.title = f"终端服务\n地址：{ipv4_ip}\n已激活服务，端口：{port}/{port+1}"
+            except AttributeError:
+                print("任务栏图标尚未初始化完成")
+        else:
+            print("任务栏图标实例不存在")
 
     #刷新菜单选项 如果有菜单选项某值需要修改字 则启动此函数，菜单动态字符必须使用外部函数形式 lambad匿名函数必须使用固定变量不能使用 self
-    def meun_dongtai(app_name, server_lujin,app_file):
-        app_open_custom_menu = pystray.MenuItem(f"自定义命令菜单", lambda item: Taskbar.app_open_customeditor_menu(server_lujin))
-        open_catalogue_menu = pystray.MenuItem("打开目录", lambda item: Taskbar.open_current_directory(server_lujin))
-        command_exit_menu = pystray.MenuItem("退出", lambda item: Taskbar.command_exit_menu())
-        name_menu = pystray.MenuItem(f"当前设备：{Taskbar.shebei_name(server_lujin)}", lambda item: Taskbar.shebei_name_xiugai(app_name, server_lujin,app_file))  
-        command_bootup_menu = pystray.MenuItem(Taskbar.command_bootup_menu_name(app_name), lambda item: Taskbar.command_bootup_menu_startup_shifouqidong(app_name, server_lujin, app_file),)
-        command_AudioBrightnes_menu = pystray.MenuItem(Taskbar.command_AudioBrightnes_menu_name(app_name,server_lujin), lambda item: Taskbar.command_AudioBrightnes_menu_startup_shifouqidong(app_name, server_lujin, app_file),)
-        command_Devices_menu = pystray.MenuItem(Taskbar.command_devices_menu_name(app_name,server_lujin), lambda item: Taskbar.command_devices_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
+    @classmethod  # 修改为类方法
+    def meun_dongtai(cls, app_name, server_lujin, app_file):  # 添加cls参数
+        # 动态菜单选项（原有代码保持不动）
+        name_menu = pystray.MenuItem(f"当前设备：{Taskbar.shebei_name(server_lujin)}", lambda item: Taskbar.shebei_name_xiugai(app_name, server_lujin, app_file))  
+        command_bootup_menu = pystray.MenuItem(Taskbar.command_bootup_menu_name(app_name), lambda item: Taskbar.command_bootup_menu_startup_shifouqidong(app_name, server_lujin, app_file))
+        command_AudioBrightnes_menu = pystray.MenuItem(Taskbar.command_AudioBrightnes_menu_name(app_name,server_lujin), lambda item: Taskbar.command_AudioBrightnes_menu_startup_shifouqidong(app_name, server_lujin, app_file))
+        command_Devices_menu = pystray.MenuItem(Taskbar.command_devices_menu_name(app_name,server_lujin), lambda item: Taskbar.command_devices_menu_startup_shifouqidong(app_name, server_lujin, app_file))
+        
+        # 保持原有菜单结构
         menu = (
             name_menu,
-            app_open_custom_menu,
+            pystray.MenuItem(f"自定义命令菜单", lambda item: Taskbar.app_open_customeditor_menu(server_lujin)),
             command_Devices_menu,
             command_AudioBrightnes_menu,
             command_bootup_menu,
-            open_catalogue_menu,
-            command_exit_menu,
+            pystray.MenuItem("打开目录", lambda item: Taskbar.open_current_directory(server_lujin)),
+            pystray.MenuItem("退出", lambda item: Taskbar.command_exit_menu()),
         )
-        serve_windows_mix_icon.menu = menu
+
+        # 通过单例实例访问
+        instance = cls.get_instance()  # 新增此行
+        if instance and instance.serve_windows_mix_icon:  # 添加安全校验
+            instance.serve_windows_mix_icon.menu = menu
 
     ##--------------------------------------------基础功能-------------------------------------------------------------
 
@@ -161,15 +200,19 @@ class Taskbar():
         os.startfile(current_directory)
 
     #退出程序
-    def command_exit_menu():
-        serve_windows_mix_icon.stop()
+    @classmethod
+    def command_exit_menu(cls):
+        # 通过单例实例访问图标
+        instance = cls.get_instance()
+        if instance and instance.serve_windows_mix_icon:
+            instance.serve_windows_mix_icon.stop()
         os._exit(0)
 
     #--------------------------------------------获得设备名字与修改设备名-------------------------------------------------------------
     def shebei_name(server_lujin):
-        with open(fr'{server_lujin}/data/orderlist.json', 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        title = data[0]['title']
+        with open(f'{server_lujin}/data/id.json', 'r', encoding='utf-8') as f:
+            id_data = json.load(f)
+        title = id_data['name']
         return title
     
     def shebei_name_xiugai(app_name, server_lujin, app_file):
@@ -179,14 +222,27 @@ class Taskbar():
                 if user_input.strip() == "":
                     messagebox.showinfo("涵涵的控制终端", "不能输入空值")
                 else:
+                    # 修改 orderlist.json
                     with open(f'{server_lujin}/data/orderlist.json', 'r', encoding='utf-8') as f:
                         data = json.load(f)
-                    data[0]['title'] = f"{user_input}"
-                    with open(f'{server_lujin}/data/orderlist.json', 'w', encoding='utf-8') as f:
-                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    # 添加 try 是为了让 orderlist 中显示设备名 可以不存在 因为新版本添加了 id.json 专门用来储存设备名  用户可以选择去除 orderlist 当然，默认是存在的
+                    try:
+                        if data[0]['//1'] != '以上是标题,可以在任务栏中修改':
+                            data[0]['title'] = f"{user_input}"
+                            with open(f'{server_lujin}/data/orderlist.json', 'w', encoding='utf-8') as f:
+                                json.dump(data, f, indent=2, ensure_ascii=False)
+                    except:
+                        pass
+                    # 修改 id.json
+                    with open(f'{server_lujin}/data/id.json', 'r', encoding='utf-8') as id_file:
+                        id_data = json.load(id_file)
+                    id_data['name'] = user_input  # 更新name字段
+                    with open(f'{server_lujin}/data/id.json', 'w', encoding='utf-8') as id_file:
+                        json.dump(id_data, id_file, indent=2, ensure_ascii=False)
+                    
                     messagebox.showinfo("涵涵的控制终端", "设备名已修改成功！")
                     window.destroy()
-                    Taskbar.meun_dongtai(app_name, server_lujin, app_file)  # 这里调用
+                    Taskbar.meun_dongtai(app_name, server_lujin, app_file)
             window = tk.Tk()
             window.title("涵涵的控制终端")
             window_width, window_height = 260, 120
@@ -259,12 +315,27 @@ class Taskbar():
         return startup_wenbenzhi_wenben
     
     def command_AudioBrightnes_menu_check_startup(app_name,server_lujin):
-        with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'r', encoding='utf-8') as file:
-            data = json.load(file)
-        for item in data:
-            if item['title'] == "亮度控制":
-                return "surr"
-        return "null"
+        file_path = f'{server_lujin}{os.sep}data{os.sep}orderlist.json'
+        if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+            print("orderlist.json 文件不存在或为空，正在创建默认配置")
+            default_data = [{"title": "音量控制", "apiUrl": "http://localhost:5202/command", "value": 50}]
+            with open(file_path, 'w', encoding='utf-8') as file:
+                json.dump(default_data, file, ensure_ascii=False, indent=2)
+            return "null"
+            
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+                for item in data:
+                    if item['title'] == "亮度控制":
+                        return "surr"
+                return "null"
+        except json.JSONDecodeError as e:
+            print(f"JSON解析错误: {str(e)}，正在重置配置文件")
+            default_data = [{"title": "音量控制", "apiUrl": "http://localhost:5202/command", "value": 50}]
+            with open(file_path, 'w', encoding='utf-8') as file:
+                json.dump(default_data, file, ensure_ascii=False, indent=2)
+            return "null"
 
     #更新小任务栏程序的右键菜单
     def command_AudioBrightnes_menu_startup_shifouqidong(app_name, server_lujin,app_file):
