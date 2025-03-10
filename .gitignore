@@ -14,3 +14,9 @@ ZDserver.spec
 /dist
 build
 .history
+data\Devices.json
+data\orderlist.json
+ZDserver.onefile-build
+ZDserver.dist
+ZDserver.build
+.gitignore

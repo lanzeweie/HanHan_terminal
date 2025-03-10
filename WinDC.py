@@ -56,6 +56,27 @@ class PPowerShell():
     def __init__(self):
         pass
 
+    # 添加缺失的IP地址获取方法
+    @staticmethod
+    def get_ipv4_now():
+        """获取当前主机的IPv4地址"""
+        try:
+            # 使用socket获取本机IP地址
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            # 连接到一个公共地址，不需要实际发送数据
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception as e:
+            print(f"获取IP地址失败: {str(e)}")
+            return "127.0.0.1"  # 失败时返回本地回环地址
+    
+    @staticmethod
+    def get_ipv4_address():
+        """兼容性方法，返回当前IP地址"""
+        return PPowerShell.get_ipv4_now()
+
     def file_json_Audio():
         need_update = False
         try:
@@ -229,6 +250,19 @@ class PPowerShell():
                     except Exception as e:
                         messagebox.showerror("涵涵的控制终端", f"保存设备名时出错: {str(e)}")
                 
+                # 添加显示App介绍图片的函数
+                def show_app_intro():
+                    try:
+                        intro_path = f"{server_lujin}{os.sep}介绍.png"
+                        if not os.path.exists(intro_path):
+                            messagebox.showinfo("涵涵的控制终端", "找不到介绍图片")
+                            return
+                            
+                        # 使用Windows默认应用打开图片
+                        os.startfile(intro_path)
+                    except Exception as e:
+                        messagebox.showerror("涵涵的控制终端", f"打开介绍图片时出错: {str(e)}")
+                
                 window = tk.Tk()
                 window.title("涵涵的控制终端")
                 window_width, window_height = 350, 180
@@ -261,10 +295,13 @@ class PPowerShell():
                 entry = tk.Entry(entry_frame, font=("微软雅黑", 10), width=30)
                 entry.pack(pady=5)
                 entry.focus_set()
-                # 确定按钮
+                
+                # 修改按钮框架为水平布局
                 button_frame = tk.Frame(main_frame, bg="#f0f0f0")
                 button_frame.pack(pady=10)
-                button = tk.Button(
+                
+                # 确定按钮
+                confirm_button = tk.Button(
                     button_frame, 
                     text="确定", 
                     command=save_device_name,
@@ -274,7 +311,21 @@ class PPowerShell():
                     relief=tk.FLAT,
                     font=("微软雅黑", 9)
                 )
-                button.pack(pady=5)
+                confirm_button.pack(side=tk.LEFT, padx=5, pady=5)
+                
+                # 添加"app介绍"按钮
+                intro_button = tk.Button(
+                    button_frame, 
+                    text="app介绍", 
+                    command=show_app_intro,
+                    width=10,
+                    bg="#282c34",
+                    fg="white",
+                    relief=tk.FLAT,
+                    font=("微软雅黑", 9)
+                )
+                intro_button.pack(side=tk.LEFT, padx=5, pady=5)
+                
                 # 绑定回车键
                 window.bind('<Return>', lambda event: save_device_name())
                 # 阻塞主线程直到窗口关闭
@@ -290,57 +341,11 @@ class PPowerShell():
                 
                 if data.get('name', '') == '':
                     print("设备名设置失败或被取消")
-                    # 可以决定是否继续程序执行或退出
-                    os._exit(1)  # 如果需要强制退出，可以取消此注释
-                else:
-                    print(f"设备名已成功设置为: {data['name']}")
-                    Taskbar.meun_dongtai(app_name, server_lujin, app_file)
-            except Exception as e:
-                print(f"检查设备名设置状态时出错: {str(e)}")
-
-    #--------------------------------屎坑 删除则无法运行 不知道作用-----------------------
-    def get_ipv4_address():  
-        ip_address = None  
-        output = subprocess.check_output('ipconfig', shell=True).decode('gbk')  
-        wireless_ip_address = PPowerShell.get_ip_address(output, 'Wireless LAN adapter')  
-        if wireless_ip_address:  
-            return wireless_ip_address  
-        ethernet_ip_address = PPowerShell.get_ip_address(output, 'Ethernet adapter')  
-        if ethernet_ip_address:  
-            return ethernet_ip_address  
-        any_ip_address = PPowerShell.get_any_ip_address(output, '192.168')  
-        if any_ip_address:  
-            return any_ip_address  
-        any_ip_address = PPowerShell.get_any_ip_address(output)  
-        return any_ip_address  
-    
-    def get_ip_address(output, adapter_type):  
-        for line in output.split('\n'):  
-            line = line.strip()  
-            if line.startswith(adapter_type) or line.startswith('无线局域网适配器'):  
-                interface_name = line.split(':')[1].strip()  
-                if line.startswith('IPv4 Address') or line.startswith('IPv4 地址'):  
-                    ip_address = line.split(':')[1].strip().split('(')[0]  
-                    if ip_address.startswith('192.168'):  
-                        return ip_address  
-        return None  
-    
-    def get_any_ip_address(output, prefix=None):  
-        for line in output.split('\n'):  
-            line = line.strip()  
-            if line.startswith('IPv4 Address') or line.startswith('IPv4 地址'):  
-                ip_address = line.split(':')[1].strip().split('(')[0]  
-                if not prefix or ip_address.startswith(prefix):  
-                    return ip_address  
-        return None
-    #--------------------------------屎坑 删除则无法运行 不知道作用-----------------------
-
-    def get_ipv4_now():
-        ip_address = None
-        try:
-            return socket.gethostbyname(socket.gethostname())
-        except socket.error:
-            pass
+            except:
+                pass
+        
+        # 修改返回值，获取并返回IP地址
+        ip_address = PPowerShell.get_ipv4_now()
         return ip_address
 
     @staticmethod
