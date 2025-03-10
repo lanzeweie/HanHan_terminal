@@ -107,45 +107,120 @@ class Taskbar():
 
     @staticmethod
     def check_for_updates():
-        from update import VersionChecker
-        checker = VersionChecker()
-        if not checker.check_for_updates():
-            Taskbar.show_update_links()
-        else:
-            window = tk.Tk()
-            window.title("版本检查")
-            window_width = 240
-            window_height = 40
-            center_window(window, window_width, window_height)
-            label = tk.Label(window, text="当前已是最新版本")
-            label.pack(pady=10)
-            window.mainloop()
+        def run_check():
+            from update import VersionChecker
+            checker = VersionChecker()
+            if not checker.check_for_updates():
+                Taskbar.show_update_links()
+            else:
+                window = tk.Tk()
+                window.title("版本检查")
+                window_width = 240
+                window_height = 40
+                center_window(window, window_width, window_height)
+                label = tk.Label(window, text="当前已是最新版本")
+                label.pack(pady=10)
+                window.mainloop()
+        
+        thread = threading.Thread(target=run_check)
+        thread.start()
 
     def show_update_links():
-        def open_github():
-            webbrowser.open("https://github.com/lanzeweie/HanHan_terminal/releases")
+        def run_update_window():
+            def open_github():
+                webbrowser.open("https://github.com/lanzeweie/HanHan_terminal/releases")
 
-        def open_gitee():
-            webbrowser.open("https://gitee.com/buxiangqumingzi/han-han_terminal/releases")
+            def open_gitee():
+                webbrowser.open("https://gitee.com/buxiangqumingzi/han-han_terminal/releases")
 
-        def open_lanzou():
-            webbrowser.open("https://wwpp.lanzouv.com/b0foy1bkb")
+            def open_lanzou():
+                webbrowser.open("https://wwpp.lanzouv.com/b0foy1bkb")
 
-        window = tk.Tk()
-        window.title("版本检查")
-        window_width = 400
-        window_height = 200
-        center_window(window, window_width, window_height)
-        label = tk.Label(window, text="发现新版本，请选择下载链接：")
-        label.pack(pady=10)
-        button_style = {"font": ("Helvetica", 12), "bg": "#007AFF", "fg": "white", "relief": "flat", "bd": 0}
-        button_github = tk.Button(window, text="GitHub", command=open_github, **button_style)
-        button_github.pack(pady=5)
-        button_gitee = tk.Button(window, text="Gitee", command=open_gitee, **button_style)
-        button_gitee.pack(pady=5)
-        button_lanzou = tk.Button(window, text="蓝奏云", command=open_lanzou, **button_style)
-        button_lanzou.pack(pady=5)
-        window.mainloop()
+            window = tk.Tk()
+            window.title("版本检查")
+            window_width = 400
+            window_height = 200
+            center_window(window, window_width, window_height)
+            label = tk.Label(window, text="发现新版本，请选择下载链接：")
+            label.pack(pady=10)
+            button_style = {"font": ("Helvetica", 12), "bg": "#007AFF", "fg": "white", "relief": "flat", "bd": 0}
+            button_github = tk.Button(window, text="GitHub", command=open_github, **button_style)
+            button_github.pack(pady=5)
+            button_gitee = tk.Button(window, text="Gitee", command=open_gitee, **button_style)
+            button_gitee.pack(pady=5)
+            button_lanzou = tk.Button(window, text="蓝奏云", command=open_lanzou, **button_style)
+            button_lanzou.pack(pady=5)
+            window.mainloop()
+        
+        thread = threading.Thread(target=run_update_window)
+        thread.start()
+        
+    @staticmethod
+    def show_custom_alert(model_id, device_id, command, result_queue):
+        def show_alert_window():
+            def on_trust():
+                result_queue.put("trust")
+                root.destroy()
+
+            def on_allow_once():
+                result_queue.put("allow_once")
+                root.destroy()
+
+            def on_reject():
+                result_queue.put("reject")
+                root.destroy()
+
+            def on_blacklist():
+                result_queue.put("blacklist")
+                root.destroy()
+
+            root = tk.Tk()
+            root.withdraw()  # 隐藏主窗口
+            alert_window = tk.Toplevel(root)
+            alert_window.title("陌生设备发起请求")
+            alert_window.attributes("-topmost", True)
+            # 设置窗口图标
+            try:
+                icon = tk.PhotoImage(file="data/zhou.png")
+                alert_window.iconphoto(False, icon)
+            except tk.TclError:
+                print("图标文件加载失败，确保路径正确且文件存在。")
+                
+            window_width = 335
+            window_height = 200
+            center_window(alert_window, window_width, window_height)
+            if command == None:
+                command = "发起获得远程使用命令授权请求"
+            label_info = tk.Label(alert_window, text=f"设备型号: {model_id}\n设备ID: {device_id}\n请求命令: {command}",
+                                font=("Helvetica", 13), pady=10)
+            label_info.pack()
+
+            button_frame = tk.Frame(alert_window)
+            button_frame.pack(pady=20)
+            button_style = {"font": ("Helvetica", 12), "bg": "#007AFF", "fg": "white", "relief": "flat", "bd": 0}
+
+            def create_button(text, command):
+                width = max(12, min(24, len(text) + 4))
+                return tk.Button(button_frame, text=text, command=command, width=width, **button_style)
+
+            button_trust = create_button("信任", on_trust)
+            button_trust.grid(row=0, column=0, padx=5, pady=5)
+            button_allow_once = create_button("同意一次", on_allow_once)
+            button_allow_once.grid(row=0, column=1, padx=5, pady=5)
+            button_reject = create_button("拒绝", on_reject)
+            button_reject.grid(row=1, column=0, padx=5, pady=5)
+            button_blacklist = create_button("加入黑名单", on_blacklist)
+            button_blacklist.grid(row=1, column=1, padx=5, pady=5)
+
+            def on_close():
+                result_queue.put("reject")  # 默认返回拒绝
+                root.destroy()
+
+            alert_window.protocol("WM_DELETE_WINDOW", on_close)
+            root.mainloop()
+            
+        thread = threading.Thread(target=show_alert_window)
+        thread.start()
 
     #更新小任务图标的文字信息
     def icon_dongtai(self, ipv4_ip, port):
@@ -186,14 +261,18 @@ class Taskbar():
     ##--------------------------------------------基础功能-------------------------------------------------------------
 
     def app_open_customeditor_menu(server_lujin):
-        if not os.path.exists(f"{server_lujin}/Custom_command_editor.exe"):
-            if not os.path.exists(f"{server_lujin}/app/Custom_command_editor.exe"):
-                messagebox.showinfo("终端命令编辑器", "应用程序不存在，请勿删除自带文件")
-                return "not"
+        def run_editor():
+            if not os.path.exists(f"{server_lujin}/Custom_command_editor.exe"):
+                if not os.path.exists(f"{server_lujin}/app/Custom_command_editor.exe"):
+                    messagebox.showinfo("终端命令编辑器", "应用程序不存在，请勿删除自带文件")
+                    return "not"
+                else:
+                    subprocess.Popen(f'{server_lujin}/app/Custom_command_editor.exe', shell=True)
             else:
-                Custom_command_editor_start = subprocess.Popen(f'{server_lujin}/app/Custom_command_editor.exe', shell=True)
-        else:
-            Custom_command_editor_start = subprocess.Popen(f'{server_lujin}/Custom_command_editor.exe', shell=True)
+                subprocess.Popen(f'{server_lujin}/Custom_command_editor.exe', shell=True)
+        
+        thread = threading.Thread(target=run_editor)
+        thread.start()
 
     def open_current_directory(server_lujin):
         current_directory = server_lujin
@@ -317,10 +396,6 @@ class Taskbar():
     def command_AudioBrightnes_menu_check_startup(app_name,server_lujin):
         file_path = f'{server_lujin}{os.sep}data{os.sep}orderlist.json'
         if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
-            print("orderlist.json 文件不存在或为空，正在创建默认配置")
-            default_data = [{"title": "音量控制", "apiUrl": "http://localhost:5202/command", "value": 50}]
-            with open(file_path, 'w', encoding='utf-8') as file:
-                json.dump(default_data, file, ensure_ascii=False, indent=2)
             return "null"
             
         try:
@@ -331,10 +406,6 @@ class Taskbar():
                         return "surr"
                 return "null"
         except json.JSONDecodeError as e:
-            print(f"JSON解析错误: {str(e)}，正在重置配置文件")
-            default_data = [{"title": "音量控制", "apiUrl": "http://localhost:5202/command", "value": 50}]
-            with open(file_path, 'w', encoding='utf-8') as file:
-                json.dump(default_data, file, ensure_ascii=False, indent=2)
             return "null"
 
     #更新小任务栏程序的右键菜单
@@ -361,16 +432,50 @@ class Taskbar():
                 
 
     def command_AudioBrightnes_menu_add_to_startup(server_lujin):
+        # 检查屏幕是否支持亮度控制
+        try:
+            # 避免循环导入，在函数内部导入
+            from WinDC import BRIGHTNESS_AVAILABLE, PPowerShell
+
+            # 首先检查必要的库是否已安装
+            if not BRIGHTNESS_AVAILABLE:
+                messagebox.showinfo("亮度控制", "无法添加亮度控制：缺少所需的库支持。\n请确保已安装 screen_brightness_control 和 wmi 库。")
+                return
+            # 检查亮度控制支持，但不实际改变亮度
+            try:
+                import screen_brightness_control as sbc
+
+                # 只获取当前亮度而不设置值
+                current_brightness = sbc.get_brightness()
+                if isinstance(current_brightness, list) and not current_brightness:
+                    messagebox.showinfo("亮度控制", "当前屏幕不支持亮度调节功能。")
+                    return
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "unsupported" in error_msg or "not supported" in error_msg or "error" in error_msg:
+                    messagebox.showinfo("亮度控制", f"当前屏幕不支持亮度调节功能。\n错误信息：{str(e)}")
+                    return
+        except Exception as e:
+            # 处理可能的导入或其他错误
+            messagebox.showinfo("亮度控制", f"无法检查亮度控制支持: {str(e)}")
+            return
+        # 屏幕支持亮度控制，添加功能
+        # 先检查是否已存在亮度控制命令
+        with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'r', encoding='utf-8') as file:
+            data = json.load(file)
+        # 检查是否已存在亮度控制
+        for item in data:
+            if item['title'] == '亮度控制':
+                # 已存在，不需要添加
+                return
+        # 不存在，添加新项目
         new_item = {
             "title": "亮度控制",
             "apiUrl": "http://192.168.1.6:5202/command",
             "guding": "n",
-            "datacommand": "nircmd.exe setbrightness {value}",
+            "datacommand": "setbrightness {value}",
             "value": 50
         }
-        
-        with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'r', encoding='utf-8') as file:
-            data = json.load(file)
         
         found_audio_control = False
         for index, item in enumerate(data):
