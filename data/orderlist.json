@@ -1,24 +1,30 @@
 [
   {
-    "title": "涵涵",
+    "title": "涵涵的笔记本",
     "//1": "以上是标题,可以在任务栏中修改",
-    "apiUrl": "http://192.168.1.6:5202/hello",
+    "apiUrl": "http://192.168.15.83:5202/hello",
     "//2": "以上是访问的地址",
     "guding": "n",
     "//3": "y 就不会改变apiUrl的地址，n就会格式化为本机地址"
   },
   {
-    "title": "立即关机",
-    "apiUrl": "http://192.168.1.6:5202/command",
+    "title": "锁屏",
+    "apiUrl": "http://192.168.15.83:5202/command",
     "guding": "n",
-    "datacommand": "shutdown /s /t 0"
+    "datacommand": "cmd.exe /c rundll32.exe user32.dll,LockWorkStation"
+  },
+  {
+    "title": "锁屏强制关机",
+    "apiUrl": "http://192.168.15.83:5202/command",
+    "guding": "n",
+    "datacommand": "cmd.exe /c shutdown /f /s /t 0"
   },
   {
     "title": "音量控制",
-    "apiUrl": "http://192.168.1.6:5202/command",
+    "apiUrl": "http://192.168.15.83:5202/command",
     "guding": "n",
-    "datacommand": "cmd.exe /c nircmd.exe setsysvolume {value}",
-    "value": 74
+    "datacommand": "setsysvolume {value}",
+    "value": 56
   },
   {
     "title": "随机一句诗歌词",
