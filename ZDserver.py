@@ -29,7 +29,10 @@ from WinTaskbar import Taskbar
 if getattr(sys, 'frozen', False):
     server_lujin = os.path.dirname(sys.executable)
 else:
-    server_lujin = os.path.dirname(os.path.abspath(__file__))
+    server_lujin = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+print(f"当前工作目录: {server_lujin}")
+
 #压缩日志
 log_file = "last.log" 
 app_file = os.path.basename(sys.argv[0])
@@ -286,7 +289,7 @@ if __name__ == '__main__':
     port = 5201
     app_name = "涵的控制终端"
     #判断是否缺失文件 也用于每次启动的初始检测
-    PPowerShell.check_files_and_dirs(app_name,app_file)
+    PPowerShell.check_files_and_dirs(app_name,app_file,server_lujin)
 
     #-----------------------Windows 小任务栏
     print("启动 Windows 小任务栏应用")

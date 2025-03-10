@@ -471,7 +471,7 @@ class Taskbar():
         # 不存在，添加新项目
         new_item = {
             "title": "亮度控制",
-            "apiUrl": "http://192.168.1.6:5202/command",
+            "apiUrl": "http://*hanhanip*:5202/command",
             "guding": "n",
             "datacommand": "setbrightness {value}",
             "value": 50

@@ -50,7 +50,7 @@ config_orderlist = "data\\orderlist.json"
 if getattr(sys, 'frozen', False):
     server_lujin = os.path.dirname(sys.executable)
 else:
-    server_lujin = os.path.dirname(os.path.abspath(__file__))
+    server_lujin = os.path.dirname(os.path.abspath(sys.argv[0]))
 
 class PPowerShell():
     def __init__(self):
@@ -188,8 +188,9 @@ class PPowerShell():
         with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
             json.dump(data, file, indent=2, ensure_ascii=False)
         print("配置文件更新完成")
-    def check_files_and_dirs(app_name, app_file):
-        files_and_dirs = [f"{server_lujin}/data"]
+
+    def check_files_and_dirs(app_name, app_file,server_lujin):
+        files_and_dirs = [f"{server_lujin}{os.sep}data"]
         for item in files_and_dirs:  
             if os.path.exists(item):  
                 pass  
@@ -199,15 +200,15 @@ class PPowerShell():
                 os._exit(1)  # 添加退出代码
         print("\n环境已检查：正常")
         # 是否第一次启动 设置第一次启动自行开启开机启动
-        if os.path.exists(f"{server_lujin}/data/one"):
+        if os.path.exists(f"{server_lujin}{os.sep}data{os.sep}one"):
             pass
         else:
-            with open(f"{server_lujin}/data/one", "w") as file:
+            with open(f"{server_lujin}{os.sep}data{os.sep}one", "w") as file:
                 pass
             Taskbar.command_bootup_menu_add_to_startup(app_name, f"{server_lujin}{os.sep}{app_file}")
         print(f"{server_lujin}{os.sep}{app_file}")
         # 检查是否需要设置设备名
-        with open(f"{server_lujin}/data/id.json", "r", encoding='utf-8') as file:
+        with open(f"{server_lujin}{os.sep}data{os.sep}id.json", "r", encoding='utf-8') as file:
             data = json.load(file)
 
         if data.get('name', '') == '':
@@ -221,21 +222,21 @@ class PPowerShell():
                     
                     try:
                         # 修改 id.json
-                        with open(f'{server_lujin}/data/id.json', 'r', encoding='utf-8') as id_file:
+                        with open(f'{server_lujin}{os.sep}data{os.sep}id.json', 'r', encoding='utf-8') as id_file:
                             id_data = json.load(id_file)
                         id_data['name'] = user_input
-                        with open(f'{server_lujin}/data/id.json', 'w', encoding='utf-8') as id_file:
+                        with open(f'{server_lujin}{os.sep}data{os.sep}id.json', 'w', encoding='utf-8') as id_file:
                             json.dump(id_data, id_file, indent=2, ensure_ascii=False)
                         
                         # 修改 orderlist.json
                         try:
-                            with open(f'{server_lujin}/data/orderlist.json', 'r', encoding='utf-8') as f:
+                            with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'r', encoding='utf-8') as f:
                                 orderlist_data = json.load(f)
                             # 添加 try 是为了让 orderlist 中显示设备名 
                             try:
                                 if orderlist_data[0]['//1'] != '以上是标题,可以在任务栏中修改':
                                     orderlist_data[0]['title'] = f"{user_input}"
-                                    with open(f'{server_lujin}/data/orderlist.json', 'w', encoding='utf-8') as f:
+                                    with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'w', encoding='utf-8') as f:
                                         json.dump(orderlist_data, f, indent=2, ensure_ascii=False)
                             except:
                                 pass
@@ -336,11 +337,12 @@ class PPowerShell():
             device_name_set = create_device_name_window()
             # 设置完成后，再次检查设备名是否已成功设置
             try:
-                with open(f"{server_lujin}/data/id.json", "r", encoding='utf-8') as file:
+                with open(f"{server_lujin}{os.sep}data{os.sep}id.json", "r", encoding='utf-8') as file:
                     data = json.load(file)
                 
                 if data.get('name', '') == '':
                     print("设备名设置失败或被取消")
+                    os._exit(1)
             except:
                 pass
         
