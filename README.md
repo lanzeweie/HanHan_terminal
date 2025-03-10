@@ -1,5 +1,6 @@
 # 涵涵的超级控制终端   
 一个 **局域网的懒人快捷操控执行远程命令助手**    
+最新代码依据 github[https://github.com/lanzeweie/HanHan_terminal](https://github.com/lanzeweie/HanHan_terminal)         
 设计的理由也很简单，"懒😊"
 由于移动端确实非常方便，简简单单的交互就可以了，所以因为 "懒" 诞生了此项目。 支持设备验证哦，安全不会遭受攻击。    
 当前项目是 服务端   
