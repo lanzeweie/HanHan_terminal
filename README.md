@@ -73,4 +73,4 @@
 
 
 ## 打包
-使用 `pyinstaller` 打包成exe即可，注意需要保持程序位置不变  
+nuitka --standalone --onefile --windows-console-mode=disable --windows-icon-from-ico=./data/zhou.ico --product-name="涵涵终端" --file-version="2.1.0" --company-name="lanzeweie" --file-description="涵涵的超级控制终端" --copyright="lanzeweie@foxmail.com" --main="./ZDserver.py" --output-filename=ZDserver --enable-plugins="anti-bloat" --enable-plugin=tk-inter
