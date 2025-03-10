@@ -1,6 +1,7 @@
 import asyncio  # 新增asyncio导入
 import datetime
 import json
+import logging  # 添加logging模块
 import os
 import socket
 import subprocess
@@ -9,6 +10,9 @@ import threading
 import time
 import winreg
 import zipfile
+
+# 设置screen_brightness_control的日志级别为ERROR，屏蔽WARNING
+logging.getLogger('screen_brightness_control.windows').setLevel(logging.ERROR)
 # 任务栏小图标
 from tkinter import messagebox
 
@@ -143,31 +147,42 @@ class flask_api_web():
                     absolute_path = os.path.join(f"{server_lujin}//app", file)
                     data_command = data_command.replace(file, absolute_path)
                     print("【控制台】发现命令的程序存在于[app/目录]中，将强行使用 [app/目录]中的程序作为程序源")
-
+                    # 这个的作用算是一个隐藏功能，不公开，作用是直接把exe 放到app文件夹下，可以直接调用
+            
             if json_data.get("value") is not None:
                 data_value = json_data.get("value")
                 def data_intstat(data_command, data_value):
+                    # 2025/3/10  音量从 niccmd 改为 python 内置功能 因为之前的软件会报毒
                     # 检测是否是音量控制命令
-                    if data_command == "setsysvolume {value}" or "nircmd.exe setsysvolume" in data_command:
+                    if data_command == "setsysvolume {value}":
                         # 直接使用WinDC.py中的音量控制功能
                         volume = int(data_value)
                         success, message = PPowerShell.control_system_volume(volume)
                         if success:
                             return "python_volume_control_success"  # 特殊标记，表示已通过Python处理
                         else:
-                            print(f"Python音量控制出现问题: {message}")
+                            print(f"音量控制出现问题: {message}")
                             return "python_volume_control_failed"  # 标记音量控制失败
+                    # 检测是否是亮度控制命令
+                    elif data_command == "setbrightness {value}":
+                        # 直接使用WinDC.py中的亮度控制功能
+                        brightness = int(data_value)
+                        success, message = PPowerShell.control_system_brightness(brightness)
+                        if success:
+                            return "python_brightness_control_success"  # 特殊标记，表示已通过Python处理
+                        else:
+                            print(f"亮度控制出现问题: {message}")
+                            return "python_brightness_control_failed"  # 标记亮度控制失败
                     else:
                         formatted_command = data_command.replace('{value}', str(data_value))
                         return formatted_command
                 data_command = data_intstat(data_command, data_value)
-            
             try:
-                # 检查是否已通过Python处理音量
+                # 检查是否已通过Python处理音量或亮度
                 if data_command == "python_volume_control_success":
-                    cmd_back = "成功修改为{}%".format(data_value)
-                elif data_command == "python_volume_control_failed":
-                    cmd_back = "设置系统音量失败"
+                    cmd_back = f"已成功将系统音量设置为{data_value}%"
+                elif data_command == "python_brightness_control_success":
+                    cmd_back = f"已成功将屏幕亮度设置为{data_value}%"
                 else:
                     output = subprocess.check_output(data_command, shell=True, stderr=subprocess.STDOUT, universal_newlines=True)
                     cmd_back = output
@@ -222,6 +237,50 @@ if __name__ == '__main__':
     print("------------------------------\n")
     print("涵的涵涵的控制终端核心")
     print("------------------------------")
+
+    # 保存原始函数引用
+    original_control_system_volume = PPowerShell.control_system_volume
+    original_control_system_brightness = PPowerShell.control_system_brightness
+
+    # 包装音量控制函数，仅在值变化时显示提示
+    def patched_control_system_volume(volume):
+        try:
+            # 读取当前配置
+            config_path = f"{server_lujin}{os.sep}data{os.sep}config.json"
+            if os.path.exists(config_path):
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                    current_volume = config.get("volume", None)
+                    # 如果当前音量与设置音量相同，则不显示更新提示
+                    if current_volume == volume:
+                        # 直接返回成功，不调用原始函数
+                        return True, "音量未变化"
+            # 只在值不同时才调用原始函数
+            return original_control_system_volume(volume)
+        except Exception as e:
+            return False, str(e)
+
+    # 包装亮度控制函数，仅在值变化时显示提示
+    def patched_control_system_brightness(brightness):
+        try:
+            # 读取当前配置
+            config_path = f"{server_lujin}{os.sep}data{os.sep}config.json"
+            if os.path.exists(config_path):
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                    current_brightness = config.get("brightness", None)
+                    # 如果当前亮度与设置亮度相同，则不显示更新提示
+                    if current_brightness == brightness:
+                        # 直接返回成功，不调用原始函数
+                        return True, "亮度未变化"
+            # 只在值不同时才调用原始函数
+            return original_control_system_brightness(brightness)
+        except Exception as e:
+            return False, str(e)
+
+    # 应用修改后的函数
+    PPowerShell.control_system_volume = patched_control_system_volume
+    PPowerShell.control_system_brightness = patched_control_system_brightness
 
     host = '0.0.0.0'
     port = 5201
