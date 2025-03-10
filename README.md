@@ -13,12 +13,14 @@
 只会显示在右下角小任务栏，静默运行  
 
 ## 使用截图
-<div style="display: flex; justify-content: space-between; gap: 20px;">
-    <div style="flex: 1;">
-        <img src="./png/1.png" alt="界面1" style="width: 100%; height: auto; border-radius: 8px; border: 1px solid #ddd;">
+<div style="display: flex; gap: 20px;">
+    <div style="width: 300px; height: 300px;">
+        <img src="./png/1.png" alt="界面1" 
+             style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
     </div>
-    <div style="flex: 1;">
-        <img src="./png/2.jpg" alt="界面2" style="width: 100%; height: auto; border-radius: 8px; border: 1px solid #ddd;">
+    <div style="width: 300px; height: 300px;">
+        <img src="./png/2.jpg" alt="界面2" 
+             style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
     </div>
 </div>
 
