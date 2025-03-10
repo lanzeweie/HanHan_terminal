@@ -13,16 +13,8 @@
 只会显示在右下角小任务栏，静默运行  
 
 ## 使用截图
-<div style="display: flex; gap: 20px;">
-    <div style="width: 300px; height: 300px;">
-        <img src="./png/1.png" alt="界面1" 
-             style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
-    </div>
-    <div style="width: 300px; height: 300px;">
-        <img src="./png/2.jpg" alt="界面2" 
-             style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
-    </div>
-</div>
+<img src="./png/1.png" alt="界面1" width="300" height="300" style="border-radius:8px;border:1px solid #ddd">
+<img src="./png/2.jpg" alt="界面2" width="300" height="300" style="border-radius:8px;border:1px solid #ddd">
 
 ## 使用方法 
 **Windows 10|11|server**  
