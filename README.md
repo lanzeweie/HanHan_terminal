@@ -75,3 +75,7 @@
 
 ## 打包
 nuitka --standalone --onefile --windows-console-mode=disable --windows-icon-from-ico=./data/zhou.ico --product-name="涵涵终端" --file-version="2.1.0" --company-name="lanzeweie" --file-description="涵涵的超级控制终端" --copyright="lanzeweie@foxmail.com" --main="./ZDserver.py" --output-filename=ZDserver --enable-plugins="anti-bloat" --enable-plugin=tk-inter
+
+
+nuitka --standalone --onefile --windows-console-mode=disable --windows-icon-from-ico=./1.ico --product-name="涵涵终端" --file-version="1.5.0" --company-name="lanzeweie" --file-description="自定义命令菜单编辑器" --copyright="lanzeweie@foxmail.com" --main="./Custom_command_editor.py" --output-filename=Custom_command_editor --enable-plugins="anti-bloat" --enable-plugin=tk-inter --include-data-files=./1.ico=1.ico
+

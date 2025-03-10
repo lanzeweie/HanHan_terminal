@@ -58,7 +58,7 @@ class Taskbar():
         app_file_taskbar = self.app_file
 
         #固定菜单选项
-        app_open_custom_menu = pystray.MenuItem(f"自定义命令菜单", lambda item: Taskbar.app_open_customeditor_menu(server_lujin_taskbar))
+        app_open_custom_menu = pystray.MenuItem(f"自定义命令菜单编辑器", lambda item: Taskbar.app_open_customeditor_menu(server_lujin_taskbar))
         open_catalogue_menu = pystray.MenuItem("打开目录", lambda item: Taskbar.open_current_directory(self.server_lujin))
         command_exit_menu = pystray.MenuItem("退出", lambda item: Taskbar.command_exit_menu())
 
