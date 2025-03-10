@@ -13,8 +13,7 @@
 只会显示在右下角小任务栏，静默运行  
 
 ## 使用截图
-<img src="./png/1.png" alt="界面1" width="300" height="300" style="border-radius:8px;border:1px solid #ddd">
-<img src="./png/2.jpg" alt="界面2" width="300" height="300" style="border-radius:8px;border:1px solid #ddd">
+![运行界面](./png/1.png)
 
 ## 使用方法 
 **Windows 10|11|server**  
