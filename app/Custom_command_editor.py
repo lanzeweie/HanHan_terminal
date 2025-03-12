@@ -47,6 +47,8 @@ class CustomDialog(tk.Toplevel):
     """自定义对话框，确保窗口大小合适"""
     def __init__(self, parent, title, prompt, initialvalue=None):
         super().__init__(parent)
+        # 先隐藏窗口，避免闪烁
+        self.withdraw()
         self.title(title)
         self.result = None
         
@@ -85,7 +87,6 @@ class CustomDialog(tk.Toplevel):
         self.entry.pack(fill="x", pady=5)
         if initialvalue:
             self.entry.insert(0, initialvalue)
-        self.entry.focus_set()
         
         # 按钮区域
         button_frame = ttk.Frame(main_frame)
@@ -98,6 +99,15 @@ class CustomDialog(tk.Toplevel):
         # 绑定事件
         self.bind("<Return>", lambda event: self.ok_command())
         self.bind("<Escape>", lambda event: self.cancel_command())
+        
+        # 确保所有几何计算完成
+        self.update_idletasks()
+        
+        # 完成所有配置后再显示窗口
+        self.deiconify()
+        
+        # 设置焦点
+        self.entry.focus_set()
         
         # 等待窗口关闭
         self.wait_window(self)
