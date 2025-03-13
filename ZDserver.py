@@ -115,6 +115,18 @@ class flask_api_web():
         current_directory = server_lujin
         json_file_path = os.path.join(current_directory, "data", "orderlist.json")
         try:
+            # 在返回数据前，先更新音量和亮度
+            # 使用单独线程进行更新，避免阻塞主线程并防止COM操作导致崩溃
+            try:
+                # 使用安全的方式获取音量和亮度信息
+                update_thread = threading.Thread(target=PPowerShell.update_volume_brightness_safe)
+                update_thread.daemon = True
+                update_thread.start()
+                update_thread.join(timeout=1.0)  # 最多等待1秒钟
+            except Exception as e:
+                print(f"更新音量亮度时出错: {str(e)}")
+            
+            # 读取和返回orderlist数据
             with open(json_file_path, "r", encoding="utf-8") as json_file:
                 response = json.load(json_file)
                 return jsonify(response)
@@ -236,6 +248,44 @@ class Basics():
         with open(f'{server_lujin}{os.sep}data{os.sep}Devices.json', 'r', encoding='utf-8') as file:
             return json.load(file)
         
+    @staticmethod
+    async def check_ipv4_Dynamic_state_async(port, taskbar_instance, loop):
+        """异步版本的IP地址变化检测函数，避免使用COM组件"""
+        last_ip = PPowerShell.get_ipv4_now()
+        
+        # 创建初始缓存文件
+        cache_path = f'{server_lujin}{os.sep}data{os.sep}audio_brightness_cache.json'
+        if not os.path.exists(cache_path):
+            # 初始化缓存文件
+            try:
+                with open(cache_path, 'w', encoding='utf-8') as f:
+                    json.dump({
+                        "volume": 50,  # 默认值
+                        "brightness": 50,  # 默认值
+                        "last_update": time.time()
+                    }, f, indent=2, ensure_ascii=False)
+            except Exception as e:
+                print(f"创建音量亮度缓存文件失败: {str(e)}")
+        
+        while True:
+            try:
+                current_ip = PPowerShell.get_ipv4_now()
+                if current_ip != last_ip:
+                    print(f"IP地址已变更: {last_ip} -> {current_ip}")
+                    # 更新任务栏IP地址
+                    taskbar_instance.update_ip(current_ip)
+                    # 调用格式化函数更新配置
+                    PPowerShell.file_json_geshihua(current_ip, port)
+                    last_ip = current_ip
+                
+                # 移除音量亮度的更新代码，改为在API请求时更新
+                
+                # 异步等待10秒
+                await asyncio.sleep(10)
+            except Exception as e:
+                print(f"IP检测异常: {str(e)}")
+                await asyncio.sleep(30)  # 出错时延长等待时间
+
 if __name__ == '__main__':
     print("------------------------------\n")
     print("涵的涵涵的控制终端核心")

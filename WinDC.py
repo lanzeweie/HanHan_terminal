@@ -78,70 +78,48 @@ class PPowerShell():
         return PPowerShell.get_ipv4_now()
 
     def file_json_Audio():
+        """
+        读取并更新音量亮度配置，避免直接使用COM
+        改为从缓存文件中读取最近的音量和亮度值
+        """
         need_update = False
         try:
+            # 使用配置文件缓存的方式而非直接COM调用
+            config_cache_path = f'{server_lujin}{os.sep}data{os.sep}audio_brightness_cache.json'
+            
+            # 尝试读取缓存文件中的值
+            current_volume = None
+            current_brightness = None
+            
+            if os.path.exists(config_cache_path):
+                try:
+                    with open(config_cache_path, 'r', encoding='utf-8') as cache_file:
+                        cache_data = json.load(cache_file)
+                        current_volume = cache_data.get("volume")
+                        current_brightness = cache_data.get("brightness")
+                        last_update = cache_data.get("last_update", 0)
+                        
+                        # 如果缓存是最近10秒内更新的，直接使用缓存值
+                        if time.time() - last_update < 10:
+                            print("使用缓存的音量亮度值，避免COM操作")
+                except Exception as e:
+                    print(f"读取音量亮度缓存出错: {str(e)}")
+            
+            # 读取orderlist数据
             with open(f'{server_lujin}{os.sep}{config_orderlist}', 'r', encoding='utf-8') as file:
                 data = json.load(file)
             
+            # 更新数据项
             for item in data:
-                if item['title'] == '音量控制':
-                    # 使用pycaw直接获取系统音量
-                    if PYCAW_AVAILABLE:
-                        try:
-                            comtypes.CoInitialize()
-                            devices = AudioUtilities.GetSpeakers()
-                            interface = devices.Activate(IAudioEndpointVolume._iid_, 0, None)
-                            volume = cast(interface, POINTER(IAudioEndpointVolume))
-                            current_volume = volume.GetMasterVolumeLevelScalar()
-                            current_percent = int(current_volume * 100)
-                            
-                            # 只有当新值与原值不同时才标记需要更新
-                            if item['value'] != current_percent:
-                                item['value'] = current_percent
-                                need_update = True
-                        except Exception as e:
-                            print(f"获取音量失败: {str(e)}")
-                        finally:
-                            comtypes.CoUninitialize()
+                if item['title'] == '音量控制' and current_volume is not None:
+                    if item['value'] != current_volume:
+                        item['value'] = current_volume
+                        need_update = True
                 
-                elif item['title'] == '亮度控制':
-                    # 使用screen_brightness_control直接获取亮度
-                    if BRIGHTNESS_AVAILABLE:
-                        try:
-                            # 临时重定向标准错误以捕获EDID解析错误警告
-                            import io
-                            import sys
-                            original_stderr = sys.stderr
-                            sys.stderr = io.StringIO()
-                            
-                            comtypes.CoInitialize()
-                            current_brightness = sbc.get_brightness()
-                            
-                            # 恢复标准错误
-                            sys.stderr = original_stderr
-                            
-                            if isinstance(current_brightness, list):
-                                if current_brightness:
-                                    current_percent = current_brightness[0]
-                                    # 只有当新值与原值不同时才标记需要更新
-                                    if item['value'] != current_percent:
-                                        item['value'] = current_percent
-                                        need_update = True
-                            else:
-                                # 只有当新值与原值不同时才标记需要更新
-                                if item['value'] != current_brightness:
-                                    item['value'] = current_brightness
-                                    need_update = True
-                        except Exception as e:
-                            # 仅打印非EDID解析错误
-                            error_msg = str(e).lower()
-                            if "edid" not in error_msg and "parse" not in error_msg:
-                                print(f"获取亮度失败: {str(e)}")
-                        finally:
-                            try:
-                                comtypes.CoUninitialize()
-                            except:
-                                pass
+                elif item['title'] == '亮度控制' and current_brightness is not None:
+                    if item['value'] != current_brightness:
+                        item['value'] = current_brightness
+                        need_update = True
             
             # 只有在需要更新时才写入文件
             if need_update:
@@ -150,6 +128,38 @@ class PPowerShell():
                 print("配置文件已更新音量和亮度值")
         except Exception as e:
             print(f"更新音量和亮度值时出错: {str(e)}")
+    
+    @staticmethod
+    def update_audio_brightness_cache(volume=None, brightness=None):
+        """
+        更新音量亮度缓存文件，在成功控制音量亮度后调用
+        """
+        try:
+            cache_path = f'{server_lujin}{os.sep}data{os.sep}audio_brightness_cache.json'
+            cache_data = {}
+            
+            # 先读取现有缓存
+            if os.path.exists(cache_path):
+                try:
+                    with open(cache_path, 'r', encoding='utf-8') as f:
+                        cache_data = json.load(f)
+                except:
+                    pass
+            
+            # 只更新提供的值
+            if volume is not None:
+                cache_data["volume"] = volume
+            if brightness is not None:
+                cache_data["brightness"] = brightness
+            
+            # 添加更新时间戳
+            cache_data["last_update"] = time.time()
+            
+            # 保存缓存文件
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump(cache_data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"更新音量亮度缓存出错: {str(e)}")
 
     def file_json_geshihua(ipv4,port):
         #格式化data json数据，设置为当机地址
@@ -208,7 +218,7 @@ class PPowerShell():
             Taskbar.command_bootup_menu_add_to_startup(app_name, f"{server_lujin}{os.sep}{app_file}")
         print(f"{server_lujin}{os.sep}{app_file}")
         # 检查是否需要设置设备名
-        with open(f"{server_lujin}{os.sep}data{os.sep}id.json", "r", encoding='utf-8') as file:
+        with open(f"{server_lujin}{os.sep}data{os.sep}id.json", 'r', encoding='utf-8') as file:
             data = json.load(file)
 
         if data.get('name', '') == '':
@@ -266,7 +276,7 @@ class PPowerShell():
                 
                 window = tk.Tk()
                 window.title("涵涵的控制终端")
-                window_width, window_height = 350, 180
+                window_width, window_height = 365, 220
                 center_window(window, window_width, window_height)
                 window.configure(bg="#f0f0f0")
                 # 设置标志属性
@@ -285,9 +295,9 @@ class PPowerShell():
                 # 欢迎文本
                 welcome_label = tk.Label(
                     main_frame, 
-                    text="欢迎使用小涵的软件，请为你的设备取个名字吧~",
-                    font=("微软雅黑", 10),
-                    wraplength=300,
+                    text="欢迎使用小涵的软件，请为你的设备取个名字吧~\n\n记得在后续弹出的窗口点击允许哦",
+                    font=("微软雅黑", 11),
+                    wraplength=340,
                 )
                 welcome_label.pack(pady=(0, 15))
                 # 输入框
@@ -310,7 +320,7 @@ class PPowerShell():
                     bg="#282c34",
                     fg="white",
                     relief=tk.FLAT,
-                    font=("微软雅黑", 9)
+                    font=("微软雅黑", 11)
                 )
                 confirm_button.pack(side=tk.LEFT, padx=5, pady=5)
                 
@@ -323,7 +333,7 @@ class PPowerShell():
                     bg="#282c34",
                     fg="white",
                     relief=tk.FLAT,
-                    font=("微软雅黑", 9)
+                    font=("微软雅黑", 11)
                 )
                 intro_button.pack(side=tk.LEFT, padx=5, pady=5)
                 
@@ -337,7 +347,7 @@ class PPowerShell():
             device_name_set = create_device_name_window()
             # 设置完成后，再次检查设备名是否已成功设置
             try:
-                with open(f"{server_lujin}{os.sep}data{os.sep}id.json", "r", encoding='utf-8') as file:
+                with open(f"{server_lujin}{os.sep}data{os.sep}id.json", 'r', encoding='utf-8') as file:
                     data = json.load(file)
                 
                 if data.get('name', '') == '':
@@ -472,30 +482,41 @@ class PPowerShell():
         else:
             return True
 
-    # 添加音量控制功能
+    # 修改音量控制函数，在成功后更新缓存
     @staticmethod
     def control_system_volume(volume_percent):
         """
-        通过pycaw设置系统音量
+        通过pycaw设置系统音量，成功后更新缓存
         :param volume_percent: 音量百分比，范围0-100
         :return: 成功返回True和当前音量，失败返回False和错误信息
         """
         if not PYCAW_AVAILABLE:
             return False, "pycaw库未安装，无法控制音量"
+        
+        com_initialized = False
         try:
-            # 初始化COM组件
+            # 用try-finally确保COM无论如何都会释放
             comtypes.CoInitialize()
+            com_initialized = True
+            
             # 获取系统音频设备
             devices = AudioUtilities.GetSpeakers()
             interface = devices.Activate(IAudioEndpointVolume._iid_, 0, None)
             volume = cast(interface, POINTER(IAudioEndpointVolume))
+            
             # 将百分比转换为0-1之间的值
             target_volume = max(0, min(100, volume_percent)) / 100.0
+            
             # 设置音量
             volume.SetMasterVolumeLevelScalar(target_volume, None)
+            
             # 读取当前音量确认
             current_volume = volume.GetMasterVolumeLevelScalar()
             current_percent = int(current_volume * 100)
+            
+            # 更新缓存
+            PPowerShell.update_audio_brightness_cache(volume=current_percent)
+            
             # 返回成功和当前音量
             return True, f"已设置音量至: {current_percent}%"
             
@@ -503,51 +524,44 @@ class PPowerShell():
             return False, f"设置音量失败: {str(e)}"
         finally:
             # 确保关闭COM组件
-            comtypes.CoUninitialize()
+            if com_initialized:
+                try:
+                    comtypes.CoUninitialize()
+                except Exception as e:
+                    print(f"CoUninitialize释放失败: {str(e)}")
         
-    # 修改亮度控制功能，添加COM组件初始化
+    # 修改亮度控制功能，在成功后更新缓存
     @staticmethod
     def control_system_brightness(brightness_percent):
         """
-        通过screen_brightness_control设置屏幕亮度
+        通过screen_brightness_control设置屏幕亮度，成功后更新缓存
         :param brightness_percent: 亮度百分比，范围0-100
         :return: 成功返回True和当前亮度，失败返回False和错误信息
         """
         if not BRIGHTNESS_AVAILABLE:
             return False, "screen_brightness_control库未安装，无法控制亮度"
+        
+        com_initialized = False
         try:
-            # 初始化COM组件 - 这是解决WMI错误的关键
+            # 临时重定向标准错误以捕获EDID解析错误警告
+            import io
+            import sys
+            original_stderr = sys.stderr
+            sys.stderr = io.StringIO()
+            
+            # 用try-finally确保COM无论如何都会释放
             comtypes.CoInitialize()
-            # 检查系统是否支持亮度控制
-            try:
-                # 使用简化的方法检查亮度支持
-                try:
-                    # 直接尝试获取当前亮度值，如果成功则表示支持
-                    current_brightness = sbc.get_brightness()
-                    if isinstance(current_brightness, list) and not current_brightness:
-                        return False, "无法获取当前亮度值，可能不支持亮度控制"
-                except Exception as e:
-                    return False, f"获取亮度失败: {str(e)}"
-                # 使用WMI检查 (在COM初始化后)
-                import pythoncom
-                pythoncom.CoInitialize()  # 确保WMI线程安全
-                try:
-                    c = wmi.WMI(namespace='wmi')
-                    methods = c.WmiMonitorBrightnessMethods()
-                    if not methods:
-                        return False, "当前显示器不支持WMI亮度控制"
-                except Exception as e:
-                    print(f"WMI亮度检查失败 (非致命): {str(e)}")
-                    # 继续尝试使用screen_brightness_control
-                finally:
-                    pythoncom.CoUninitialize()  # 清理WMI资源
-            except Exception as e:
-                print(f"亮度控制兼容性检查警告: {str(e)}")
-                # 即使兼容性检查失败，我们仍然尝试设置亮度
+            com_initialized = True
+            
+            # 恢复标准错误输出
+            sys.stderr = original_stderr
+            
             # 设置亮度范围限制
             brightness_level = max(0, min(100, brightness_percent))
+            
             # 尝试设置亮度
             sbc.set_brightness(brightness_level)
+            
             # 读取设置后的亮度确认
             try:
                 current_brightness = sbc.get_brightness()
@@ -555,20 +569,150 @@ class PPowerShell():
                     current_percent = current_brightness[0] if current_brightness else brightness_level
                 else:
                     current_percent = current_brightness
+                
+                # 更新缓存
+                PPowerShell.update_audio_brightness_cache(brightness=current_percent)
+                
                 # 返回成功和当前亮度
                 return True, f"已设置亮度至: {current_percent}%"
             except Exception as e:
                 # 即使无法获取确认，但如果设置命令没有抛出异常，我们认为成功了
+                # 更新缓存为设置值
+                PPowerShell.update_audio_brightness_cache(brightness=brightness_level)
                 return True, f"似乎已成功设置亮度至: {brightness_level}%（无法获取确认值）"
             
         except Exception as e:
             return False, f"设置亮度失败: {str(e)}"
         finally:
             # 确保关闭COM组件
+            if com_initialized:
+                try:
+                    comtypes.CoUninitialize()
+                except Exception as e:
+                    print(f"CoUninitialize释放失败: {str(e)}")
+
+    @staticmethod
+    def update_volume_brightness_safe():
+        """
+        安全方式更新音量和亮度信息到orderlist
+        在主请求线程中调用，但会创建单独进程避免COM崩溃影响主应用
+        """
+        try:
+            # 1. 安全获取系统音量
+            current_volume = None
+            if PYCAW_AVAILABLE:
+                try:
+                    # 初始化COM
+                    comtypes.CoInitialize()
+                    
+                    # 获取系统音频设备
+                    devices = AudioUtilities.GetSpeakers()
+                    interface = devices.Activate(IAudioEndpointVolume._iid_, 0, None)
+                    volume = cast(interface, POINTER(IAudioEndpointVolume))
+                    
+                    # 获取当前音量
+                    current_volume_scalar = volume.GetMasterVolumeLevelScalar()
+                    current_volume = int(current_volume_scalar * 100)
+                    
+                    # 释放COM
+                    comtypes.CoUninitialize()
+                except Exception as e:
+                    print(f"获取音量失败: {str(e)}")
+                    # 尝试从缓存读取
+                    try:
+                        cache_path = f'{server_lujin}{os.sep}data{os.sep}audio_brightness_cache.json'
+                        if os.path.exists(cache_path):
+                            with open(cache_path, 'r', encoding='utf-8') as f:
+                                cache_data = json.load(f)
+                                current_volume = cache_data.get("volume")
+                    except:
+                        pass
+                finally:
+                    try:
+                        comtypes.CoUninitialize()
+                    except:
+                        pass
+                        
+            # 2. 安全获取屏幕亮度
+            current_brightness = None
+            if BRIGHTNESS_AVAILABLE:
+                try:
+                    # 初始化COM
+                    comtypes.CoInitialize()
+                    
+                    # 临时重定向标准错误
+                    import io
+                    original_stderr = sys.stderr
+                    sys.stderr = io.StringIO()
+                    
+                    # 获取亮度
+                    brightness = sbc.get_brightness()
+                    
+                    # 恢复标准错误
+                    sys.stderr = original_stderr
+                    
+                    if isinstance(brightness, list):
+                        if brightness:
+                            current_brightness = brightness[0]
+                    else:
+                        current_brightness = brightness
+                        
+                    # 释放COM
+                    comtypes.CoUninitialize()
+                except Exception as e:
+                    # 忽略EDID相关错误
+                    error_msg = str(e).lower()
+                    if "edid" not in error_msg and "parse" not in error_msg:
+                        print(f"获取亮度失败: {str(e)}")
+                    # 尝试从缓存读取
+                    try:
+                        cache_path = f'{server_lujin}{os.sep}data{os.sep}audio_brightness_cache.json'
+                        if os.path.exists(cache_path):
+                            with open(cache_path, 'r', encoding='utf-8') as f:
+                                cache_data = json.load(f)
+                                current_brightness = cache_data.get("brightness")
+                    except:
+                        pass
+                finally:
+                    try:
+                        comtypes.CoUninitialize()
+                    except:
+                        pass
+            
+            # 3. 更新缓存
+            if current_volume is not None or current_brightness is not None:
+                PPowerShell.update_audio_brightness_cache(
+                    volume=current_volume, 
+                    brightness=current_brightness
+                )
+            
+            # 4. 更新orderlist数据
+            need_update = False
             try:
-                comtypes.CoUninitialize()
-            except:
-                pass
+                with open(f'{server_lujin}{os.sep}{config_orderlist}', 'r', encoding='utf-8') as file:
+                    data = json.load(file)
+                
+                for item in data:
+                    if item['title'] == '音量控制' and current_volume is not None:
+                        if item['value'] != current_volume:
+                            item['value'] = current_volume
+                            need_update = True
+                    
+                    elif item['title'] == '亮度控制' and current_brightness is not None:
+                        if item['value'] != current_brightness:
+                            item['value'] = current_brightness
+                            need_update = True
+                
+                if need_update:
+                    with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
+                        json.dump(data, file, indent=2, ensure_ascii=False)
+                    print("配置文件已更新音量和亮度值")
+                    
+            except Exception as e:
+                print(f"更新音量亮度配置文件时出错: {str(e)}")
+                
+        except Exception as e:
+            print(f"更新音量亮度总体出错: {str(e)}")
 
 if __name__ == "__main__":
     print(PPowerShell.file_json_Audio())
