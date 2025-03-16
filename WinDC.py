@@ -53,6 +53,11 @@ else:
     server_lujin = os.path.dirname(os.path.abspath(sys.argv[0]))
 
 class PPowerShell():
+    # 添加静态变量跟踪上次更新时间
+    last_volume_brightness_update = 0
+    # 设置最小更新间隔(秒)
+    MIN_UPDATE_INTERVAL = 5
+    
     def __init__(self):
         pass
 
@@ -101,7 +106,7 @@ class PPowerShell():
                         
                         # 如果缓存是最近10秒内更新的，直接使用缓存值
                         if time.time() - last_update < 10:
-                            print("使用缓存的音量亮度值，避免COM操作")
+                            print("使用缓存的音量亮度值")
                 except Exception as e:
                     print(f"读取音量亮度缓存出错: {str(e)}")
             
@@ -209,6 +214,19 @@ class PPowerShell():
                 messagebox.showinfo("涵涵的控制终端核心", f"缺失{item}")  
                 os._exit(1)  # 添加退出代码
         print("\n环境已检查：正常")
+        
+        # 检查data/id.json文件是否存在，不存在则创建
+        id_json_path = f"{server_lujin}{os.sep}data{os.sep}id.json"
+        if not os.path.exists(id_json_path):
+            print(f"创建{id_json_path}")
+            try:
+                with open(id_json_path, 'w', encoding='utf-8') as file:
+                    json.dump({"name": ""}, file, ensure_ascii=False, indent=2)
+            except Exception as e:
+                print(f"创建{id_json_path}失败: {str(e)}")
+                messagebox.showinfo("涵涵的控制终端核心", f"创建{id_json_path}失败: {str(e)}")
+                os._exit(1)
+                
         # 是否第一次启动 设置第一次启动自行开启开机启动
         if os.path.exists(f"{server_lujin}{os.sep}data{os.sep}one"):
             pass
@@ -596,7 +614,17 @@ class PPowerShell():
         """
         安全方式更新音量和亮度信息到orderlist
         在主请求线程中调用，但会创建单独进程避免COM崩溃影响主应用
+        添加高频访问限制，避免因为用户高频访问导致COM崩溃
         """
+        # 添加高频访问限制
+        current_time = time.time()
+        if current_time - PPowerShell.last_volume_brightness_update < PPowerShell.MIN_UPDATE_INTERVAL:
+            print(f"更新音量和亮度过于频繁，已跳过本次更新 (间隔: {current_time - PPowerShell.last_volume_brightness_update:.2f}秒)")
+            return False
+            
+        # 更新时间戳
+        PPowerShell.last_volume_brightness_update = current_time
+        
         try:
             # 1. 安全获取系统音量
             current_volume = None
