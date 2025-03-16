@@ -20,3 +20,8 @@ ZDserver.onefile-build
 ZDserver.dist
 ZDserver.build
 .gitignore
+app\Custom_command_editor.exe
+data\id.json
+data\Devices.json
+data\orderlist.json
+data\audio_brightness_cache.json
