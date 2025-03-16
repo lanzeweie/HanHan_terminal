@@ -20,5 +20,3 @@ ZDserver.onefile-build
 ZDserver.dist
 ZDserver.build
 .gitignore
-data\orderlist.json
-data\Devices.json
