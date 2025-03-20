@@ -1,6 +1,9 @@
-flask_cors
-flask
-waitress
-pystray
-psutil
-requests
+flask_cors==5.0.1
+flask==3.1.0
+waitress==3.0.2
+pystray==0.19.5
+psutil==6.1.1
+requests==2.32.3
+comtypes==1.4.10
+screen_brightness_control==0.24.2
+WMI==1.5.1
