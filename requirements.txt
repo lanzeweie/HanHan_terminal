@@ -7,3 +7,4 @@ requests==2.32.3
 comtypes==1.4.10
 screen_brightness_control==0.24.2
 WMI==1.5.1
+pycaw==20240210
