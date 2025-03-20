@@ -432,63 +432,74 @@ class Taskbar():
                 
 
     def command_AudioBrightnes_menu_add_to_startup(server_lujin):
-        # 检查屏幕是否支持亮度控制
-        try:
-            # 避免循环导入，在函数内部导入
-            from WinDC import BRIGHTNESS_AVAILABLE, PPowerShell
-
-            # 首先检查必要的库是否已安装
-            if not BRIGHTNESS_AVAILABLE:
-                messagebox.showinfo("亮度控制", "无法添加亮度控制：缺少所需的库支持。\n请确保已安装 screen_brightness_control 和 wmi 库。")
-                return
-            # 检查亮度控制支持，但不实际改变亮度
+        def check_and_add_brightness_control():
+            # 检查屏幕是否支持亮度控制
             try:
-                import screen_brightness_control as sbc
+                # 避免循环导入，在函数内部导入
+                from WinDC import BRIGHTNESS_AVAILABLE, PPowerShell
 
-                # 只获取当前亮度而不设置值
-                current_brightness = sbc.get_brightness()
-                if isinstance(current_brightness, list) and not current_brightness:
-                    messagebox.showinfo("亮度控制", "当前屏幕不支持亮度调节功能。")
+                # 首先检查必要的库是否已安装
+                if not BRIGHTNESS_AVAILABLE:
+                    messagebox.showinfo("亮度控制", "无法添加亮度控制：缺少所需的库支持。\n请确保已安装 screen_brightness_control 和 wmi 库。")
                     return
+                # 检查亮度控制支持，但不实际改变亮度
+                try:
+                    import screen_brightness_control as sbc
+
+                    # 只获取当前亮度而不设置值
+                    current_brightness = sbc.get_brightness()
+                    if isinstance(current_brightness, list) and not current_brightness:
+                        messagebox.showinfo("亮度控制", "当前屏幕不支持亮度调节功能。")
+                        return
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    if "unsupported" in error_msg or "not supported" in error_msg or "error" in error_msg:
+                        messagebox.showinfo("亮度控制", f"当前屏幕不支持亮度调节功能。\n错误信息：{str(e)}")
+                        return
             except Exception as e:
-                error_msg = str(e).lower()
-                if "unsupported" in error_msg or "not supported" in error_msg or "error" in error_msg:
-                    messagebox.showinfo("亮度控制", f"当前屏幕不支持亮度调节功能。\n错误信息：{str(e)}")
-                    return
-        except Exception as e:
-            # 处理可能的导入或其他错误
-            messagebox.showinfo("亮度控制", f"无法检查亮度控制支持: {str(e)}")
-            return
-        # 屏幕支持亮度控制，添加功能
-        # 先检查是否已存在亮度控制命令
-        with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'r', encoding='utf-8') as file:
-            data = json.load(file)
-        # 检查是否已存在亮度控制
-        for item in data:
-            if item['title'] == '亮度控制':
-                # 已存在，不需要添加
+                # 处理可能的导入或其他错误
+                messagebox.showinfo("亮度控制", f"无法检查亮度控制支持: {str(e)}")
                 return
-        # 不存在，添加新项目
-        new_item = {
-            "title": "亮度控制",
-            "apiUrl": "http://*hanhanip*:5202/command",
-            "guding": "n",
-            "datacommand": "setbrightness {value}",
-            "value": 50
-        }
+            
+            # 屏幕支持亮度控制，添加功能
+            try:
+                # 先检查是否已存在亮度控制命令
+                with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'r', encoding='utf-8') as file:
+                    data = json.load(file)
+                
+                # 检查是否已存在亮度控制
+                for item in data:
+                    if item['title'] == '亮度控制':
+                        # 已存在，不需要添加
+                        return
+                
+                # 不存在，添加新项目
+                new_item = {
+                    "title": "亮度控制",
+                    "apiUrl": "http://*hanhanip*:5202/command",
+                    "guding": "n",
+                    "datacommand": "setbrightness {value}",
+                    "value": 50
+                }
+                
+                found_audio_control = False
+                for index, item in enumerate(data):
+                    if item['title'] == '音量控制':
+                        data.insert(index + 1, new_item)
+                        found_audio_control = True
+                        break
+                
+                if not found_audio_control:
+                    data.append(new_item)
+                
+                with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'w', encoding='utf-8') as file:
+                    json.dump(data, file, ensure_ascii=False, indent=2)
+            except Exception as e:
+                messagebox.showinfo("亮度控制", f"添加亮度控制时出错: {str(e)}")
         
-        found_audio_control = False
-        for index, item in enumerate(data):
-            if item['title'] == '音量控制':
-                data.insert(index + 1, new_item)
-                found_audio_control = True
-                break
-        
-        if not found_audio_control:
-            data.append(new_item)
-        
-        with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'w', encoding='utf-8') as file:
-            json.dump(data, file, ensure_ascii=False, indent=2)
+        # 使用线程运行检查和添加亮度控制的函数，防止UI卡死
+        thread = threading.Thread(target=check_and_add_brightness_control)
+        thread.start()
 
     #-陌生设备接入-----------------------------------------------------------------------------------------------
     # 加载设备配置文件width

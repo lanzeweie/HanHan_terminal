@@ -262,7 +262,7 @@ class PPowerShell():
                                 orderlist_data = json.load(f)
                             # 添加 try 是为了让 orderlist 中显示设备名 
                             try:
-                                if orderlist_data[0]['//1'] != '以上是标题,可以在任务栏中修改':
+                                if orderlist_data[0]['//1'] == '以上是标题,可以在任务栏中修改':
                                     orderlist_data[0]['title'] = f"{user_input}"
                                     with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'w', encoding='utf-8') as f:
                                         json.dump(orderlist_data, f, indent=2, ensure_ascii=False)
@@ -282,7 +282,7 @@ class PPowerShell():
                 # 添加显示App介绍图片的函数
                 def show_app_intro():
                     try:
-                        intro_path = f"{server_lujin}{os.sep}介绍.png"
+                        intro_path = f"{server_lujin}{os.sep}LookMe.png"
                         if not os.path.exists(intro_path):
                             messagebox.showinfo("涵涵的控制终端", "找不到介绍图片")
                             return
