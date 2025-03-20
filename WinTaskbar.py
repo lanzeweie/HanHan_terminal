@@ -306,7 +306,7 @@ class Taskbar():
                         data = json.load(f)
                     # 添加 try 是为了让 orderlist 中显示设备名 可以不存在 因为新版本添加了 id.json 专门用来储存设备名  用户可以选择去除 orderlist 当然，默认是存在的
                     try:
-                        if data[0]['//1'] != '以上是标题,可以在任务栏中修改':
+                        if data[0]['//1'] == '以上是标题,可以在任务栏中修改':
                             data[0]['title'] = f"{user_input}"
                             with open(f'{server_lujin}/data/orderlist.json', 'w', encoding='utf-8') as f:
                                 json.dump(data, f, indent=2, ensure_ascii=False)
@@ -322,17 +322,72 @@ class Taskbar():
                     messagebox.showinfo("涵涵的控制终端", "设备名已修改成功！")
                     window.destroy()
                     Taskbar.meun_dongtai(app_name, server_lujin, app_file)
+
             window = tk.Tk()
-            window.title("涵涵的控制终端")
-            window_width, window_height = 260, 120
+            window.title("修改设备名称")
+            window_width, window_height = 320, 180
             center_window(window, window_width, window_height)
-            label = tk.Label(window, text="请输入新的设备名：")
-            label.pack(pady=10)
-            entry = tk.Entry(window)
-            entry.pack(pady=10)
+            
+            # 创建一个主框架来容纳所有控件
+            main_frame = tk.Frame(window, padx=20, pady=20)
+            main_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # 标题标签
+            title_label = tk.Label(main_frame, text="设置新的设备名称", font=("Helvetica", 14, "bold"))
+            title_label.pack(pady=(0, 15))
+            
+            # 创建输入框
+            entry_frame = tk.Frame(main_frame)
+            entry_frame.pack(fill=tk.X, pady=5)
+            
+            entry = tk.Entry(entry_frame, font=("Helvetica", 12), bd=2, relief=tk.GROOVE)
+            entry.pack(fill=tk.X, ipady=5)
             entry.focus_set()
-            button = tk.Button(window, text="确定", command=get_input)
-            button.pack(pady=10)
+            
+            # 获取当前设备名以预填充输入框
+            try:
+                with open(f'{server_lujin}/data/id.json', 'r', encoding='utf-8') as id_file:
+                    id_data = json.load(id_file)
+                    current_name = id_data.get('name', '')
+                    if current_name:
+                        entry.insert(0, current_name)
+                        # 全选文本以便用户可以直接输入覆盖
+                        entry.select_range(0, tk.END)
+            except:
+                pass
+            
+            # 创建按钮框架
+            button_frame = tk.Frame(main_frame)
+            button_frame.pack(pady=15)
+            
+            # 美化按钮样式
+            button_style = {
+                "font": ("Helvetica", 12),
+                "bg": "#007AFF",
+                "fg": "white",
+                "relief": tk.FLAT,
+                "bd": 0,
+                "padx": 15,
+                "pady": 5,
+                "cursor": "hand2"  # 鼠标悬停时显示手型光标
+            }
+            
+            # 确认按钮
+            confirm_button = tk.Button(button_frame, text="确定", command=get_input, **button_style)
+            confirm_button.pack(side=tk.LEFT, padx=5)
+            
+            # 取消按钮
+            cancel_button = tk.Button(button_frame, text="取消", command=window.destroy,
+                                      bg="#E0E0E0", fg="#333333", font=("Helvetica", 12),
+                                      relief=tk.FLAT, bd=0, padx=15, pady=5, cursor="hand2")
+            cancel_button.pack(side=tk.LEFT, padx=5)
+            
+            # 绑定回车键进行提交
+            window.bind("<Return>", lambda event: get_input())
+            
+            # 绑定Esc键关闭窗口
+            window.bind("<Escape>", lambda event: window.destroy())
+            
             window.mainloop()
     
         thread = threading.Thread(target=create_window)
@@ -494,6 +549,23 @@ class Taskbar():
                 
                 with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'w', encoding='utf-8') as file:
                     json.dump(data, file, ensure_ascii=False, indent=2)
+                    
+                # 添加成功后更新菜单状态并显示消息
+                # 获取全局变量
+                global app_name_taskbar, app_file_taskbar
+                
+                def update_menu():
+                    try:
+                        # 在主线程中执行更新
+                        Taskbar.meun_dongtai(app_name_taskbar, server_lujin, app_file_taskbar)
+                        # 显示成功消息
+                        #messagebox.showinfo("亮度控制", "亮度控制功能已成功添加！")
+                    except Exception as e:
+                        print(f"更新菜单时出错: {str(e)}")
+                
+                # 在主线程中执行UI更新
+                threading.Thread(target=update_menu).start()
+                    
             except Exception as e:
                 messagebox.showinfo("亮度控制", f"添加亮度控制时出错: {str(e)}")
         
