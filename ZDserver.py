@@ -87,9 +87,11 @@ class FlaskAPIWeb:
         with open(id_path, "r", encoding="utf-8") as f:
             id_data = json.load(f)
             name = id_data.get("name", "")
+        mac_address = PPowerShell.get_mac_address()
         return jsonify({
             "title": name,
             "execution_time": current_time,
+            "mac": mac_address,
             "success": True
         })
 
@@ -244,16 +246,28 @@ class FlaskAPIWeb:
 class ServerBasics:
     @staticmethod
     def run_socket(host, port):
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # 改为UDP
         try:
             server_socket.bind((host, port))
-            server_socket.listen(20)
             print(f"Socket服务已启动在 {host}:{port}")
+            server_socket.settimeout(1.0)  # 设置超时以允许优雅关闭
             while True:
-                client_socket, client_address = server_socket.accept()
-                current_time = datetime.datetime.now().strftime('[%Y-%m-%d %H:%M:%S]')
-                print(f"【{current_time}】已被设备 {client_address} 发现")
-                client_socket.close()
+                try:
+                    data, client_address = server_socket.recvfrom(1024)  # UDP接收数据
+                    current_time = datetime.datetime.now().strftime('[%Y-%m-%d %H:%M:%S]')
+                    print(f"【{current_time}】已被设备 {client_address} 发现")
+                    # UDP响应设备名称
+                    id_path = os.path.join(server_lujin, "data", "id.json")
+                    with open(id_path, "r", encoding="utf-8") as f:
+                        id_data = json.load(f)
+                    name = id_data.get("name", "")
+                    response = name.encode('utf-8')
+                    server_socket.sendto(response, client_address)
+                except socket.timeout:
+                    continue  # 超时后继续循环
+                except Exception as e:
+                    print(f"UDP接收数据异常: {str(e)}")
+                    continue
         except Exception as e:
             print(f"Socket服务启动失败: {str(e)}")
             messagebox.showinfo("错误", f"端口绑定失败: {str(e)}")

@@ -10,11 +10,13 @@ import sys
 import threading
 import time
 import tkinter as tk  # 添加tkinter导入
+import uuid  # 添加uuid导入用于获取MAC地址
 # 添加音量控制所需的库
 from ctypes import POINTER, cast
 from tkinter import messagebox
 
 import comtypes
+import psutil  # 添加psutil导入用于获取网络接口信息
 
 try:
     from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
@@ -516,28 +518,21 @@ class PPowerShell():
             # 用try-finally确保COM无论如何都会释放
             comtypes.CoInitialize()
             com_initialized = True
-            
             # 获取系统音频设备
             devices = AudioUtilities.GetSpeakers()
             interface = devices.Activate(IAudioEndpointVolume._iid_, 0, None)
             volume = cast(interface, POINTER(IAudioEndpointVolume))
-            
             # 将百分比转换为0-1之间的值
             target_volume = max(0, min(100, volume_percent)) / 100.0
-            
             # 设置音量
             volume.SetMasterVolumeLevelScalar(target_volume, None)
-            
             # 读取当前音量确认
             current_volume = volume.GetMasterVolumeLevelScalar()
             current_percent = int(current_volume * 100)
-            
             # 更新缓存
             PPowerShell.update_audio_brightness_cache(volume=current_percent)
-            
             # 返回成功和当前音量
             return True, f"已设置音量至: {current_percent}%"
-            
         except Exception as e:
             return False, f"设置音量失败: {str(e)}"
         finally:
@@ -742,5 +737,30 @@ class PPowerShell():
         except Exception as e:
             print(f"更新音量亮度总体出错: {str(e)}")
 
+    # 只保留获取当前活动网络接口MAC地址的方法
+    @staticmethod
+    def get_mac_address():
+        try:
+            current_ip = PPowerShell.get_ipv4_now()
+            interfaces = psutil.net_if_addrs()
+            for interface_name, addresses in interfaces.items():
+                has_current_ip = False
+                mac_address = None
+                
+                for addr in addresses:
+                    if addr.family == socket.AF_INET and addr.address == current_ip:
+                        has_current_ip = True
+                    elif addr.family == psutil.AF_LINK:  # MAC地址
+                        mac_address = addr.address
+                if has_current_ip and mac_address:
+                    mac_formatted = mac_address.lower().replace('-', ':')
+                    return mac_formatted
+            return "00:00:00:00:00:00"
+        except Exception as e:
+            print(f"获取活动网络接口MAC地址失败: {str(e)}")
+            return "00:00:00:00:00:00"  # 失败时返回默认值
+
 if __name__ == "__main__":
-    print(PPowerShell.file_json_Audio())
+    #print(PPowerShell.file_json_Audio())
+    print(f"当前活动网络接口MAC地址: {PPowerShell.get_mac_address()}")
+    print(f"当前IP地址: {PPowerShell.get_ipv4_now()}")
