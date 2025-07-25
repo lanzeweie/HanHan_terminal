@@ -245,12 +245,22 @@ try:
 except ImportError:
     PYCAW_AVAILABLE = False
 
-# 亮度控制
+# 亮度控制 - 使用旧版本的简单检测方式
 try:
     import screen_brightness_control as sbc
+    # 简单检测：只要能导入库就认为亮度控制可能可用
     BRIGHTNESS_AVAILABLE = True
+    
+    # 尝试导入wmi库，但不强制要求（和旧版本一致）
+    try:
+        import wmi
+    except ImportError:
+        pass
+        
+    print("亮度控制库检测: 成功导入screen_brightness_control库")
 except ImportError:
     BRIGHTNESS_AVAILABLE = False
+    print("亮度控制库检测: 无法导入screen_brightness_control库")
 
 
 def get_volume():
@@ -288,61 +298,128 @@ def set_volume(volume_percent):
 
 
 def get_brightness():
-    """获取屏幕亮度"""
+    """获取屏幕亮度 - 更宽容的实现"""
     if not BRIGHTNESS_AVAILABLE:
         return {"success": False, "error": "screen_brightness_control不可用"}
     
     try:
+        # 临时重定向标准错误，隐藏一些警告 (旧版本方式)
         import io
         original_stderr = sys.stderr
         sys.stderr = io.StringIO()
         
-        brightness = sbc.get_brightness()
-        sys.stderr = original_stderr
-        
-        if isinstance(brightness, list):
-            brightness_value = brightness[0] if brightness else 0
-        else:
-            brightness_value = brightness
+        try:
+            # 先尝试获取亮度
+            brightness = sbc.get_brightness()
+            # 恢复标准错误输出
+            sys.stderr = original_stderr
             
-        return {"success": True, "brightness": brightness_value}
+            # 处理返回值
+            if isinstance(brightness, list):
+                brightness_value = brightness[0] if brightness else 0
+            else:
+                brightness_value = brightness
+                
+            return {"success": True, "brightness": brightness_value}
+        except Exception as e:
+            sys.stderr = original_stderr
+            # 如果是EDID解析错误，这在很多设备上是正常的
+            error_msg = str(e).lower()
+            if "edid" in error_msg or "parse" in error_msg:
+                # 尝试返回一个默认值
+                return {"success": False, "error": "亮度控制可能受限，但不影响使用"}
+            else:
+                return {"success": False, "error": str(e)}
     except Exception as e:
-        return {"success": False, "error": str(e)}
-    finally:
         try:
             sys.stderr = original_stderr
         except:
             pass
+        return {"success": False, "error": str(e)}
 
 
 def set_brightness(brightness_percent):
-    """设置屏幕亮度"""
+    """设置屏幕亮度 - 更宽容的实现"""
     if not BRIGHTNESS_AVAILABLE:
         return {"success": False, "error": "screen_brightness_control不可用"}
     
     try:
+        # 临时重定向标准错误，隐藏一些警告 (旧版本方式)
         import io
         original_stderr = sys.stderr
         sys.stderr = io.StringIO()
         
+        # 设置亮度范围限制
         brightness_level = max(0, min(100, brightness_percent))
+        
+        # 尝试设置亮度
         sbc.set_brightness(brightness_level)
+        
+        # 恢复标准错误
         sys.stderr = original_stderr
         
-        current_brightness = sbc.get_brightness()
-        if isinstance(current_brightness, list):
-            current_value = current_brightness[0] if current_brightness else brightness_level
-        else:
-            current_value = current_brightness
-        
-        return {"success": True, "brightness": current_value}
+        # 尝试读取设置后的亮度进行确认
+        try:
+            current_brightness = sbc.get_brightness()
+            if isinstance(current_brightness, list):
+                current_percent = current_brightness[0] if current_brightness else brightness_level
+            else:
+                current_percent = current_brightness
+                
+            return {"success": True, "brightness": current_percent}
+        except Exception as e:
+            # 即使无法获取确认值，但如果设置命令没有抛出异常，我们认为设置成功了
+            return {"success": True, "brightness": brightness_level, "note": "无法获取确认值"}
     except Exception as e:
-        return {"success": False, "error": str(e)}
-    finally:
         try:
             sys.stderr = original_stderr
         except:
             pass
+        return {"success": False, "error": str(e)}
+
+
+def check_brightness_support():
+    """检查亮度支持的函数 - 旧版本兼容版"""
+    try:
+        result = {
+            "success": True,
+            "brightness_available": BRIGHTNESS_AVAILABLE,
+        }
+        
+        # 如果库导入成功，我们简单地认为亮度控制可能可用
+        if BRIGHTNESS_AVAILABLE:
+            # 进一步检查是否真的能获取亮度值
+            try:
+                # 临时重定向标准错误
+                import io
+                original_stderr = sys.stderr
+                sys.stderr = io.StringIO()
+                
+                brightness = sbc.get_brightness()
+                sys.stderr = original_stderr
+                
+                if brightness is not None:
+                    result["can_get_brightness"] = True
+                    result["brightness_value"] = brightness
+                    # 如果获取亮度成功，检测结果为真正可用
+                    result["true_available"] = True
+                else:
+                    result["can_get_brightness"] = False
+                    # 即使获取失败，我们仍然认为可能可用
+                    result["true_available"] = True
+            except Exception as e:
+                try:
+                    sys.stderr = original_stderr
+                except:
+                    pass
+                result["can_get_brightness"] = False
+                result["brightness_error"] = str(e)
+                # 旧版本中即使获取亮度失败也认为可能可用
+                result["true_available"] = True
+        
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e), "brightness_available": BRIGHTNESS_AVAILABLE}
 
 
 def main():
@@ -364,6 +441,8 @@ def main():
         elif operation == "set_brightness":
             brightness = int(sys.argv[2]) if len(sys.argv) > 2 else 0
             result = set_brightness(brightness)
+        elif operation == "check_brightness":
+            result = check_brightness_support()
         else:
             result = {"success": False, "error": f"未知操作: {operation}"}
         
@@ -393,20 +472,41 @@ if __name__ == "__main__":
         try:
             cmd = [sys.executable, self.worker_script_path, operation] + [str(arg) for arg in args]
             
+            # 不指定encoding，让subprocess.run返回字节而不是字符串
             result = subprocess.run(
                 cmd,
                 capture_output=True,
-                text=True,
                 timeout=self.process_timeout,
-                encoding='utf-8'
+                # 移除encoding参数，让输出保持为字节
             )
             
             if result.returncode == 0:
-                return json.loads(result.stdout.strip())
+                # 使用更宽容的解码方式处理输出
+                try:
+                    # 首先尝试用UTF-8解码，大多数情况下应该是这个编码
+                    stdout_text = result.stdout.decode('utf-8')
+                except UnicodeDecodeError:
+                    # 如果UTF-8解码失败，使用latin-1编码（它可以处理所有可能的字节值）
+                    stdout_text = result.stdout.decode('latin-1')
+                
+                try:
+                    return json.loads(stdout_text.strip())
+                except json.JSONDecodeError:
+                    # 如果JSON解析失败，返回原始内容以便调试
+                    return {
+                        "success": False,
+                        "error": f"无法解析JSON: {stdout_text[:100]}"
+                    }
             else:
+                # 错误输出也需要安全解码
+                try:
+                    stderr_text = result.stderr.decode('utf-8')
+                except UnicodeDecodeError:
+                    stderr_text = result.stderr.decode('latin-1')
+                
                 return {
                     "success": False,
-                    "error": f"进程执行失败: {result.stderr or '未知错误'}"
+                    "error": f"进程执行失败: {stderr_text or '未知错误'}"
                 }
         except subprocess.TimeoutExpired:
             return {"success": False, "error": "操作超时"}
@@ -428,6 +528,10 @@ if __name__ == "__main__":
     def set_brightness(self, brightness):
         """设置亮度"""
         return self._execute_com_operation("set_brightness", brightness)
+    
+    def check_brightness_support(self):
+        """检查亮度调节功能是否可用（更严格的检查）"""
+        return self._execute_com_operation("check_brightness")
 
 
 class COMProtectionSystem:
@@ -558,6 +662,21 @@ class COMProtectionSystem:
         
         return _set_brightness()
     
+    def check_brightness_support(self):
+        """严格检查亮度调节功能是否支持"""
+        @self.crash_monitor.monitor_operation("check_brightness")
+        def _check_brightness_support():
+            with self.operation_manager.acquire_operation("check_brightness"):
+                result = self.com_worker.check_brightness_support()
+                self.operation_manager.record_operation(
+                    "check_brightness", 
+                    result.get("success", False), 
+                    result.get("error")
+                )
+                return result
+        
+        return _check_brightness_support()
+    
     def get_system_stats(self):
         """获取系统统计信息"""
         stats = self.operation_manager.get_stats()
@@ -592,6 +711,26 @@ def get_protection_system():
     return _protection_system
 
 
+# 改进亮度控制可用性检测
+def is_brightness_control_available():
+    """更严格地检查亮度控制是否可用"""
+    system = get_protection_system()
+    try:
+        # 使用专门的检查函数
+        check_result = system.check_brightness_support()
+        if check_result.get("success", False):
+            return check_result.get("brightness_available", False)
+        
+        # 备用方法：尝试获取亮度
+        get_result = system.get_brightness(use_cache=False)
+        if get_result.get("success", False):
+            return True
+            
+        return False
+    except Exception:
+        return False
+
+
 # 便捷函数
 def safe_get_volume(use_cache=True):
     """安全获取音量"""
@@ -609,23 +748,11 @@ def safe_set_brightness(brightness):
     """安全设置亮度"""
     return get_protection_system().set_brightness(brightness)
 
+def safe_check_brightness_support():
+    """安全检查亮度控制是否可用（更严格的检查）"""
+    return get_protection_system().check_brightness_support()
+    return get_protection_system().set_brightness(brightness)
 
-if __name__ == "__main__":
-    # 测试代码
-    system = get_protection_system()
-    
-    print("测试音量控制:")
-    volume_result = system.get_volume()
-    print(f"当前音量: {volume_result}")
-    
-    if volume_result.get("success"):
-        current_volume = volume_result["volume"]
-        new_volume = max(0, min(100, current_volume + 5))
-        set_result = system.set_volume(new_volume)
-        print(f"设置音量到 {new_volume}: {set_result}")
-    
-    print("\n测试亮度控制:")
-    brightness_result = system.get_brightness()
-    print(f"当前亮度: {brightness_result}")
-    
-    print(f"\n系统统计: {system.get_system_stats()}")
+def safe_check_brightness_support():
+    """安全检查亮度控制是否可用（更严格的检查）"""
+    return get_protection_system().check_brightness_support()

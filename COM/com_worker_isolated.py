@@ -21,12 +21,36 @@ try:
 except ImportError:
     PYCAW_AVAILABLE = False
 
-# 亮度控制
+# 亮度控制 - 使用更宽松的检测方式
 try:
     import screen_brightness_control as sbc
-    BRIGHTNESS_AVAILABLE = True
+    
+    # 更简单的检测方式 - 只要能导入库并执行基本操作就认为可用
+    try:
+        # 首先尝试获取亮度列表
+        monitors = sbc.list_monitors()
+        
+        # 然后尝试获取亮度值
+        brightness_value = sbc.get_brightness(display=0 if monitors else None)
+        
+        # 如果能够正常获取亮度值，就认为亮度控制可用
+        if brightness_value is not None:
+            if isinstance(brightness_value, list):
+                BRIGHTNESS_AVAILABLE = len(brightness_value) > 0
+            else:
+                BRIGHTNESS_AVAILABLE = True
+        else:
+            BRIGHTNESS_AVAILABLE = False
+            
+        print(f"亮度检测: 获取到值={brightness_value}, 支持亮度控制={BRIGHTNESS_AVAILABLE}")
+        
+    except Exception as e:
+        BRIGHTNESS_AVAILABLE = False
+        print(f"基本亮度检测失败: {str(e)}")
+    
 except ImportError:
     BRIGHTNESS_AVAILABLE = False
+    print("无法导入screen_brightness_control库")
 
 
 def get_volume():
@@ -66,14 +90,18 @@ def set_volume(volume_percent):
 def get_brightness():
     """获取屏幕亮度"""
     if not BRIGHTNESS_AVAILABLE:
-        return {"success": False, "error": "screen_brightness_control不可用"}
+        return {"success": False, "error": "screen_brightness_control不可用或当前设备不支持亮度调节"}
     
     try:
         import io
         original_stderr = sys.stderr
         sys.stderr = io.StringIO()
         
-        brightness = sbc.get_brightness()
+        try:
+            brightness = sbc.get_brightness(display=0)  # 尝试特定显示器
+        except:
+            brightness = sbc.get_brightness()  # 如果失败，尝试默认方式
+            
         sys.stderr = original_stderr
         
         if isinstance(brightness, list):
@@ -81,9 +109,9 @@ def get_brightness():
         else:
             brightness_value = brightness
             
-        return {"success": True, "brightness": brightness_value}
+        return {"success": True, "brightness": brightness_value, "brightness_available": True}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": str(e), "brightness_available": False}
     finally:
         try:
             sys.stderr = original_stderr
@@ -94,7 +122,7 @@ def get_brightness():
 def set_brightness(brightness_percent):
     """设置屏幕亮度"""
     if not BRIGHTNESS_AVAILABLE:
-        return {"success": False, "error": "screen_brightness_control不可用"}
+        return {"success": False, "error": "screen_brightness_control不可用或当前设备不支持亮度调节"}
     
     try:
         import io
@@ -102,23 +130,77 @@ def set_brightness(brightness_percent):
         sys.stderr = io.StringIO()
         
         brightness_level = max(0, min(100, brightness_percent))
-        sbc.set_brightness(brightness_level)
+        
+        # 尝试特定显示器，如果失败则尝试默认方式
+        try:
+            sbc.set_brightness(brightness_level, display=0)
+        except:
+            sbc.set_brightness(brightness_level)
+            
         sys.stderr = original_stderr
         
-        current_brightness = sbc.get_brightness()
+        # 再次获取当前值作为确认
+        try:
+            current_brightness = sbc.get_brightness(display=0)
+        except:
+            current_brightness = sbc.get_brightness()
+            
         if isinstance(current_brightness, list):
             current_value = current_brightness[0] if current_brightness else brightness_level
         else:
             current_value = current_brightness
         
-        return {"success": True, "brightness": current_value}
+        return {"success": True, "brightness": current_value, "brightness_available": True}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": str(e), "brightness_available": False}
     finally:
         try:
             sys.stderr = original_stderr
         except:
             pass
+
+
+def check_brightness_support():
+    """专门检查亮度支持的函数 - 更宽松的版本"""
+    try:
+        result = {
+            "success": True,
+            "brightness_available": BRIGHTNESS_AVAILABLE,
+        }
+        
+        # 尝试简单获取亮度值，这是最基本的检测
+        try:
+            brightness = sbc.get_brightness()
+            result["simple_check"] = True
+            result["brightness_value"] = brightness
+            
+            # 即使BRIGHTNESS_AVAILABLE是False，如果能成功获取亮度，也视为支持
+            if brightness is not None and not BRIGHTNESS_AVAILABLE:
+                result["brightness_available"] = True
+                print("亮度检查: 虽然初始检测失败，但能获取亮度值，判定为支持")
+        except Exception as e:
+            result["simple_check"] = False
+            result["simple_check_error"] = str(e)
+        
+        # 列出所有显示器
+        try:
+            import screen_brightness_control as sbc
+            displays = sbc.list_monitors()
+            result["displays"] = displays
+            result["has_displays"] = len(displays) > 0
+            
+            # 如果有显示器列表，可能支持亮度控制
+            if result["has_displays"] and not result["brightness_available"]:
+                result["brightness_available"] = True
+                print(f"亮度检查: 发现{len(displays)}个显示器，判定可能支持亮度控制")
+        except Exception as e:
+            result["displays"] = []
+            result["has_displays"] = False
+            result["display_list_error"] = str(e)
+            
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e), "brightness_available": False}
 
 
 def main():
@@ -140,6 +222,8 @@ def main():
         elif operation == "set_brightness":
             brightness = int(sys.argv[2]) if len(sys.argv) > 2 else 0
             result = set_brightness(brightness)
+        elif operation == "check_brightness":
+            result = check_brightness_support()
         else:
             result = {"success": False, "error": f"未知操作: {operation}"}
         
