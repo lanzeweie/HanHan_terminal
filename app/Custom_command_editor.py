@@ -562,7 +562,12 @@ class App(tk.Frame):
         self.style.configure("TButton", padding=5, font=('微软雅黑', 10))
         self.style.configure("TLabel", font=('微软雅黑', 10))
         self.style.configure("Title.TLabel", font=('微软雅黑', 16, 'bold'))
-        
+        self.style.configure("Treeview.Heading", font=('微软雅黑', 10, 'bold'))
+        self.style.configure("Treeview", font=('微软雅黑', 10), rowheight=25)
+        self.style.map("Treeview", background=[("selected", "#0078D7")], foreground=[("selected", "white")])
+        self.style.configure("Odd.TLabel", background="lightgray")
+        self.style.configure("Even.TLabel", background="white")
+
         # 创建提示文字区域
         self.create_tip_area()
         
@@ -586,7 +591,7 @@ class App(tk.Frame):
         
         tip_text = ttk.Label(
             tip_frame,
-            text="锁定命令条，即可让执行的IP地址固定，不会因为终端的地址变化而变化\n添加自定义命令，就是cmd命令，记得在你的命令前面添加 “cmd.exe /c 你的命令”\n添加URL，任意API链接只支持GET模式\n已锁定未锁定作用是让IP会不会变化，但是新版本已经去除了IP变化功能,所以无意义",
+            text="自定义命令功能是调用Windows的运行组件，一般情况建议使用cmd来执行命令，即在你的命令前面添加 “cmd.exe /c 你的命令”\nURL命令功能：调用url连接，获得返回的结果，不支持添加参数\n对于需要参数可以尝试直接编辑用户文档\\orderlist.json根据音量示范添加{value}值",
             wraplength=600,
         )
         tip_text.pack(side="top", pady=5)
@@ -604,18 +609,23 @@ class App(tk.Frame):
         list_frame = ttk.Frame(main_frame)
         list_frame.pack(side="left", fill="both", expand=True, padx=(0, 10))
         
-        # 创建列表框和滚动条
-        self.menu_list = tk.Listbox(list_frame, width=50, height=15, font=("微软雅黑", 11), borderwidth=1, relief="solid")
-        self.menu_list.pack(side="left", fill="both", expand=True)
+        # 创建Treeview，显示命令和类型
+        self.menu_list = ttk.Treeview(list_frame, columns=("type"))
+        self.menu_list.heading("#0", text="命令")
+        self.menu_list.heading("type", text="类型")
+
+        self.menu_list.column("#0", width=250)
+        self.menu_list.column("type", width=120, anchor="center")
         
-        # 删除tag_configure行，Listbox没有此方法
+        self.menu_list.pack(side="left", fill="both", expand=True)
         
         scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self.menu_list.yview)
         scrollbar.pack(side="right", fill="y")
         self.menu_list.config(yscrollcommand=scrollbar.set)
         
         # 绑定事件
-        self.menu_list.bind("<ButtonRelease-1>", self.on_select)
+        self.menu_list.bind("<<TreeviewSelect>>", self.on_select)
+        self.menu_list.bind("<Double-1>", self.on_double_click)  # 添加双击事件处理
         
         # 按钮区域 - 使用网格布局分组排列
         button_frame = ttk.Frame(main_frame)
@@ -625,18 +635,15 @@ class App(tk.Frame):
         operation_frame = ttk.LabelFrame(button_frame, text="当前命令操作")
         operation_frame.pack(fill="x", pady=(0, 10), padx=5)
         
-        self.lock_button = ttk.Button(operation_frame, text="锁定状态", command=self.toggle_lock)
-        self.lock_button.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
-        
         self.modify_command_button = ttk.Button(
             operation_frame, text="编辑", command=self.modify_command, state="disabled"
         )
-        self.modify_command_button.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        self.modify_command_button.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
         
         self.delete_command_button = ttk.Button(
             operation_frame, text="删除命令", command=self.delete_command, state="disabled"
         )
-        self.delete_command_button.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
+        self.delete_command_button.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         
         # 第二组按钮：添加新命令
         add_frame = ttk.LabelFrame(button_frame, text="添加新命令")
@@ -673,22 +680,6 @@ class App(tk.Frame):
         self.device_manager_button = ttk.Button(system_frame, text="设备管理", command=self.open_device_manager)
         self.device_manager_button.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
 
-    def toggle_lock(self):
-        """切换锁定状态"""
-        selection = self.menu_list.curselection()
-        if not selection:
-            return
-        
-        index = selection[0]
-        item = self.data[index]
-        if item["guding"] == "y":
-            item["guding"] = "n"
-            self.lock_button.config(text="未锁定")
-        else:
-            item["guding"] = "y"
-            self.lock_button.config(text="已锁定")
-        self.save_data()
-
     def save_data(self):
         """保存数据到文件"""
         try:
@@ -699,84 +690,236 @@ class App(tk.Frame):
 
     def init_menu_list(self):
         """初始化菜单列表"""
-        self.menu_list.delete(0, tk.END)
+        for i in self.menu_list.get_children():
+            self.menu_list.delete(i)
+        
         for i, item in enumerate(self.data):
             title = item["title"]
             
             if "datacommand" in item:
-                title += " [自定义命令]"
-                self.menu_list.insert(tk.END, title)
-                self.menu_list.itemconfig(i, foreground="green")
+                cmd_type = "⚙️ 自定义命令"
+                content = item["datacommand"]
             elif "apiUrlCommand" in item:
-                title += " [API链接]"
-                self.menu_list.insert(tk.END, title)
-                self.menu_list.itemconfig(i, foreground="red")
+                cmd_type = "🔗 API链接"
+                content = item["apiUrl"]
+            elif "url" in item and item["url"] == "yes":
+                cmd_type = "🌐 URL"
+                content = item["apiUrl"]
             else:
-                self.menu_list.insert(tk.END, title)
+                cmd_type = "系统命令"
+                content = "系统内置命令"
+
+            # 创建主项
+            parent_tag = f"item{i}"
+            parent_id = self.menu_list.insert("", "end", parent_tag, text=title, values=(cmd_type,))
+            
+            # 创建子项显示命令内容
+            content_id = self.menu_list.insert(parent_tag, "end", text=f"{content}")
+            
+            # 默认展开所有项
+            self.menu_list.item(parent_id, open=True)
+            
+            # 为不同行设置交替颜色
+            if i % 2 == 0:
+                self.menu_list.tag_configure(parent_tag, background="#f0f0f0")
 
     def on_select(self, event):
         """列表选择事件处理"""
-        if not self.menu_list.curselection():
+        if not self.menu_list.selection():
             self.reset_buttons()
             return
-
-        index = self.menu_list.curselection()[0]
-        item = self.data[index]
         
-        # 更新按钮状态 - 修改逻辑以处理所有类型的项目
-        can_edit = "datacommand" in item or ("apiUrlCommand" in item and item["apiUrlCommand"] == "yes")
-        can_delete = can_edit or ("url" in item and item["url"] == "yes")
+        selected_item = self.menu_list.selection()[0]
         
-        self.modify_command_button.config(state="normal" if can_edit else "disabled")
-        self.delete_command_button.config(state="normal" if can_delete else "disabled")
+        # 检查是否选中了子项，如果是则获取父项
+        if self.menu_list.parent(selected_item):
+            selected_item = self.menu_list.parent(selected_item)
+        
+        # 通过item标签获取索引
+        item_tag = selected_item
+        if item_tag.startswith('item'):
+            index = int(item_tag[4:])
+            
+            item = self.data[index]
+            
+            # 更新按钮状态
+            can_edit = "datacommand" in item or ("apiUrlCommand" in item and item["apiUrlCommand"] == "yes")
+            can_delete = can_edit or ("url" in item and item["url"] == "yes")
+            
+            self.modify_command_button.config(state="normal" if can_edit else "disabled")
+            self.delete_command_button.config(state="normal" if can_delete else "disabled")
+            
+            # 更新移动按钮状态
+            self.update_move_buttons(index)
+        else:
+            self.reset_buttons()
 
-        # 设置锁定按钮文本
-        lock_text = "已锁定" if item["guding"] == "y" else "未锁定"
-        self.lock_button.config(text=lock_text)
+    def on_double_click(self, event):
+        """双击事件处理 - 快速编辑命令"""
+        selection = self.menu_list.selection()
+        if not selection:
+            return
+            
+        selected_item = selection[0]
+        
+        # 检查是否选中了子项，如果是则获取父项
+        if self.menu_list.parent(selected_item):
+            selected_item = self.menu_list.parent(selected_item)
+            
+        # 获取索引
+        if selected_item.startswith('item'):
+            index = int(selected_item[4:])
+            item = self.data[index]
+            
+            # 检查命令是否可编辑
+            can_edit = "datacommand" in item or ("apiUrlCommand" in item and item["apiUrlCommand"] == "yes")
+            
+            # 如果命令可编辑，则打开编辑界面
+            if can_edit:
+                self.modify_command()
 
-        # 更新移动按钮状态
-        self.update_move_buttons()
+    def update_move_buttons(self, index=None):
+        """更新移动按钮状态"""
+        if index is None:
+            self.move_up_button.config(state="disabled")
+            self.move_down_button.config(state="disabled")
+            return
+        
+        self.move_up_button.config(state="normal" if index > 0 else "disabled")
+        self.move_down_button.config(state="normal" if index < len(self.data) - 1 else "disabled")
 
     def reset_buttons(self):
         """重置按钮状态"""
         self.modify_command_button.config(state="disabled")
         self.delete_command_button.config(state="disabled")
-        self.lock_button.config(text="锁定状态")
         self.move_up_button.config(state="disabled")
         self.move_down_button.config(state="disabled")
-
+        
+    # 其他方法需要相应修改，使用item标签获取索引
     def modify_command(self):
         """修改命令"""
-        selection = self.menu_list.curselection()
+        selection = self.menu_list.selection()
         if not selection:
             return
             
-        index = selection[0]
-        item = self.data[index]
+        selected_item = selection[0]
         
-        if "datacommand" in item:
-            dialog_title = "修改命令"
-            dialog_text = "请输入新命令"
-            initial_value = item["datacommand"]
+        # 检查是否选中了子项，如果是则获取父项
+        if self.menu_list.parent(selected_item):
+            selected_item = self.menu_list.parent(selected_item)
             
-            dialog = CustomDialog(self.master, dialog_title, dialog_text, initial_value)
-            new_command = dialog.result
+        # 获取索引
+        if selected_item.startswith('item'):
+            index = int(selected_item[4:])
+            item = self.data[index]
             
-            if new_command is not None:
-                item["datacommand"] = new_command
-                self.save_data()
+            if "datacommand" in item:
+                dialog_title = "修改命令"
+                dialog_text = "请输入新命令"
+                initial_value = item["datacommand"]
                 
-        elif "apiUrlCommand" in item and item["apiUrlCommand"] == "yes":
-            dialog_title = "修改API URL"
-            dialog_text = "请输入新的API URL"
-            initial_value = item["apiUrl"]
+                dialog = CustomDialog(self.master, dialog_title, dialog_text, initial_value)
+                new_command = dialog.result
+                
+                if new_command is not None:
+                    item["datacommand"] = new_command
+                    self.save_data()
+                    
+            elif "apiUrlCommand" in item and item["apiUrlCommand"] == "yes":
+                dialog_title = "修改API URL"
+                dialog_text = "请输入新的API URL"
+                initial_value = item["apiUrl"]
+                
+                dialog = CustomDialog(self.master, dialog_title, dialog_text, initial_value)
+                new_url = dialog.result
+                
+                if new_url is not None:
+                    item["apiUrl"] = new_url
+                    self.save_data()
+        
+        self.init_menu_list()
+        # 选中修改后的项
+        self.menu_list.selection_set(f"item{index}")
+
+    def delete_command(self):
+        """删除命令"""
+        selection = self.menu_list.selection()
+        if not selection:
+            return
             
-            dialog = CustomDialog(self.master, dialog_title, dialog_text, initial_value)
-            new_url = dialog.result
+        selected_item = selection[0]
+        
+        # 检查是否选中了子项，如果是则获取父项
+        if self.menu_list.parent(selected_item):
+            selected_item = self.menu_list.parent(selected_item)
             
-            if new_url is not None:
-                item["apiUrl"] = new_url
+        # 获取索引
+        if selected_item.startswith('item'):
+            index = int(selected_item[4:])
+            item = self.data[index]
+            
+            confirm = messagebox.askyesno("确认删除", f"确定要删除命令 {item['title']} 吗？")
+            if confirm:
+                del self.data[index]
                 self.save_data()
+                self.init_menu_list()
+                self.reset_buttons()
+
+    def move_up(self):
+        """上移命令"""
+        selection = self.menu_list.selection()
+        if not selection: 
+            return
+        
+        selected_item = selection[0]
+        
+        # 检查是否选中了子项，如果是则获取父项
+        if self.menu_list.parent(selected_item):
+            selected_item = self.menu_list.parent(selected_item)
+            
+        # 获取索引
+        if selected_item.startswith('item'):
+            index = int(selected_item[4:])
+            
+            if index > 0:
+                self.data[index], self.data[index - 1] = self.data[index - 1], self.data[index]
+                self.save_data()
+                self.init_menu_list()
+                
+                # 选中移动后的项
+                self.menu_list.selection_set(f"item{index-1}")
+                self.menu_list.focus(f"item{index-1}")
+                self.menu_list.see(f"item{index-1}")
+
+    def move_down(self):
+        """下移命令"""
+        selection = self.menu_list.selection()
+        if not selection: 
+            return
+        
+        selected_item = selection[0]
+        
+        # 检查是否选中了子项，如果是则获取父项
+        if self.menu_list.parent(selected_item):
+            selected_item = self.menu_list.parent(selected_item)
+            
+        # 获取索引
+        if selected_item.startswith('item'):
+            index = int(selected_item[4:])
+            
+            if index < len(self.data) - 1:
+                self.data[index], self.data[index + 1] = self.data[index + 1], self.data[index]
+                self.save_data()
+                self.init_menu_list()
+                
+                # 选中移动后的项
+                self.menu_list.selection_set(f"item{index+1}")
+                self.menu_list.focus(f"item{index+1}")
+                self.menu_list.see(f"item{index+1}")
+
+    def open_device_manager(self):
+        """打开设备管理器"""
+        DeviceManagerDialog(self.master)
 
     def add_custom_command(self):
         """添加自定义命令"""
@@ -794,34 +937,14 @@ class App(tk.Frame):
                     "guding": "n",
                     "datacommand": datacommand,
                 })
-                
-                # 更新列表并选中新项目
-                index = len(self.data) - 1
-                self.menu_list.insert(tk.END, title + " [自定义命令]")
-                self.menu_list.itemconfig(index, foreground="green")  # 直接设置颜色
-                self.menu_list.selection_clear(0, tk.END)
-                self.menu_list.select_set(index)
-                self.menu_list.see(index)  # 确保新项目可见
-                
-                # 更新按钮状态并保存
-                self.on_select(None)
                 self.save_data()
-
-    def delete_command(self):
-        """删除命令"""
-        selection = self.menu_list.curselection()
-        if not selection:
-            return
-            
-        index = selection[0]
-        item = self.data[index]
-        
-        confirm = messagebox.askyesno("确认删除", f"确定要删除命令 {item['title']} 吗？")
-        if confirm:
-            self.menu_list.delete(index)
-            del self.data[index]
-            self.save_data()
-            self.reset_buttons()
+                self.init_menu_list()
+                
+                # 选中新添加的项
+                last_item_id = f"item{len(self.data)-1}"
+                self.menu_list.selection_set(last_item_id)
+                self.menu_list.focus(last_item_id)
+                self.menu_list.see(last_item_id)
 
     def add_url(self):
         """添加URL"""
@@ -839,61 +962,14 @@ class App(tk.Frame):
                     "guding": "y", 
                     "url": "yes"
                 })
-                
-                # 更新列表并选中新项目
-                index = len(self.data) - 1
-                self.menu_list.insert(tk.END, title + " [API链接]")
-                self.menu_list.itemconfig(index, foreground="red")
-                self.menu_list.selection_clear(0, tk.END)
-                self.menu_list.select_set(index)
-                self.menu_list.see(index)  # 确保新项目可见
-                
-                # 更新按钮状态并保存
-                self.on_select(None)
                 self.save_data()
-
-    def move_up(self):
-        """上移命令"""
-        index = self.menu_list.curselection()[0]
-        if index > 0:
-            self.data[index], self.data[index - 1] = self.data[index - 1], self.data[index]
-            self.init_menu_list()
-            self.save_data()
-            
-            # 保持选择在移动后的项目上
-            self.menu_list.selection_clear(0, tk.END)
-            self.menu_list.select_set(index - 1)
-            self.menu_list.see(index - 1)
-            self.update_move_buttons()
-
-    def move_down(self):
-        """下移命令"""
-        index = self.menu_list.curselection()[0]
-        if index < len(self.data) - 1:
-            self.data[index], self.data[index + 1] = self.data[index + 1], self.data[index]
-            self.init_menu_list()
-            self.save_data()
-            
-            # 保持选择在移动后的项目上
-            self.menu_list.selection_clear(0, tk.END)
-            self.menu_list.select_set(index + 1)
-            self.menu_list.see(index + 1)
-            self.update_move_buttons()
-
-    def update_move_buttons(self):
-        """更新移动按钮状态"""
-        if not self.menu_list.curselection():
-            self.move_up_button.config(state="disabled")
-            self.move_down_button.config(state="disabled")
-            return
-            
-        index = self.menu_list.curselection()[0]
-        self.move_up_button.config(state="normal" if index > 0 else "disabled")
-        self.move_down_button.config(state="normal" if index < len(self.data) - 1 else "disabled")
-
-    def open_device_manager(self):
-        """打开设备管理器"""
-        DeviceManagerDialog(self.master)
+                self.init_menu_list()
+                
+                # 选中新添加的项
+                last_item_id = f"item{len(self.data)-1}"
+                self.menu_list.selection_set(last_item_id)
+                self.menu_list.focus(last_item_id)
+                self.menu_list.see(last_item_id)
 
     def import_from_clipboard(self):
         """从剪贴板导入命令"""
@@ -923,8 +999,6 @@ class App(tk.Frame):
                         "guding": item.get("guding", "n"),
                         "datacommand": item.get("datacommand", "")
                     }
-                    display_text = f"{new_item['title']} [自定义命令]"
-                    color = "green"
                 elif "apiUrlCommand" in item and item["apiUrlCommand"] == "yes":
                     # URL类型
                     new_item = {
@@ -933,26 +1007,19 @@ class App(tk.Frame):
                         "guding": item.get("guding", "y"),
                         "apiUrlCommand": "yes"
                     }
-                    display_text = f"{new_item['title']} [API链接]"
-                    color = "red"
                 else:
                     messagebox.showerror("导入失败", "剪贴板中的数据格式不正确")
                     return
                 
                 # 添加到数据列表
                 self.data.append(new_item)
-                
-                # 更新列表并选中新项目
-                index = len(self.data) - 1
-                self.menu_list.insert(tk.END, display_text)
-                self.menu_list.itemconfig(index, foreground=color)
-                self.menu_list.selection_clear(0, tk.END)
-                self.menu_list.select_set(index)
-                self.menu_list.see(index)  # 确保新项目可见
-                
-                # 更新按钮状态并保存
-                self.on_select(None)
                 self.save_data()
+                self.init_menu_list()
+                
+                last_item_id = self.menu_list.get_children()[-1]
+                self.menu_list.selection_set(last_item_id)
+                self.menu_list.focus(last_item_id)
+                
                 messagebox.showinfo("导入成功", f"已成功导入命令: {new_item['title']}")
                 
             except json.JSONDecodeError:
@@ -994,9 +1061,9 @@ def main():
             print(f"无法加载图标: {str(e)}")
     
     # 设置窗口大小
-    window_width = 780
-    window_height = 630
-    root.minsize(600, 400)
+    window_width = 920
+    window_height = 590
+    root.minsize(700, 500)
     
     # 计算屏幕中央位置
     screen_width = root.winfo_screenwidth()
