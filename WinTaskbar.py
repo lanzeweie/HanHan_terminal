@@ -236,15 +236,26 @@ class Taskbar():
             try:
                 # 检查模块文件是否存在
                 module_path = os.path.join(server_lujin, "app", "Custom_command_editor.py")
+                exe_path = os.path.join(server_lujin, "app", "Custom_command_editor.exe")
+                
+                # 检查py文件
                 if not os.path.exists(module_path):
                     # 兼容旧版本，检查根目录下的py文件
                     module_path = os.path.join(server_lujin, "Custom_command_editor.py")
+                    exe_path = os.path.join(server_lujin, "Custom_command_editor.exe")
+                    
+                    # 如果py文件不存在，检查是否有exe文件
                     if not os.path.exists(module_path):
-                        # 在主线程中显示消息
-                        tk.messagebox.showinfo("终端命令编辑器", "自定义命令编辑器模块不存在，请勿删除自带文件")
-                        return "not"
+                        if os.path.exists(exe_path):
+                            # 找到exe文件，直接运行
+                            subprocess.Popen(exe_path, shell=True)
+                            return
+                        else:
+                            # 在主线程中显示消息
+                            tk.messagebox.showinfo("终端命令编辑器", "自定义命令编辑器模块不存在，请勿删除自带文件")
+                            return "not"
             
-                # 动态导入并运行模块
+                # 动态导入并运行py模块
                 import importlib.util
                 import sys
 
