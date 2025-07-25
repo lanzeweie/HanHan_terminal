@@ -279,9 +279,10 @@ class Taskbar():
                     # 兼容旧版本，检查根目录下的py文件
                     module_path = os.path.join(server_lujin, "Custom_command_editor.py")
                     if not os.path.exists(module_path):
-                        messagebox.showinfo("终端命令编辑器", "自定义命令编辑器模块不存在，请勿删除自带文件")
+                        # 在主线程中显示消息
+                        tk.messagebox.showinfo("终端命令编辑器", "自定义命令编辑器模块不存在，请勿删除自带文件")
                         return "not"
-                
+            
                 # 动态导入并运行模块
                 import importlib.util
                 import sys
@@ -290,26 +291,40 @@ class Taskbar():
                 module_dir = os.path.dirname(module_path)
                 if module_dir not in sys.path:
                     sys.path.insert(0, module_dir)
-                
+            
                 # 动态加载模块
                 spec = importlib.util.spec_from_file_location("custom_command_editor", module_path)
                 if spec is None:
-                    messagebox.showinfo("终端命令编辑器", "无法加载自定义命令编辑器模块")
+                    tk.messagebox.showinfo("终端命令编辑器", "无法加载自定义命令编辑器模块")
                     return "not"
-                
+            
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
-                
+            
                 # 运行主函数
                 if hasattr(module, 'main'):
                     module.main()
                 else:
-                    messagebox.showinfo("终端命令编辑器", "自定义命令编辑器模块格式错误")
-                    
+                    tk.messagebox.showinfo("终端命令编辑器", "自定义命令编辑器模块格式错误")
+                
             except Exception as e:
-                messagebox.showinfo("终端命令编辑器", f"启动自定义命令编辑器时发生错误：{str(e)}")
+                # 在主线程中安全地显示错误消息
+                def show_error():
+                    tk.messagebox.showinfo("终端命令编辑器", f"启动自定义命令编辑器时发生错误：{str(e)}")
+                if threading.current_thread() is threading.main_thread():
+                    show_error()
+                else:
+                    # 如果在子线程中，将消息框操作调度到主线程
+                    try:
+                        root = tk.Tk()
+                        root.withdraw()
+                        root.after(0, lambda: [show_error(), root.destroy()])
+                        root.mainloop()
+                    except:
+                        print(f"启动自定义命令编辑器时发生错误：{str(e)}")
         
         thread = threading.Thread(target=run_editor)
+        thread.daemon = True  # 设置为守护线程，这样主程序退出时线程也会退出
         thread.start()
 
     def open_current_directory(server_lujin):
