@@ -14,9 +14,46 @@ from tkinter import TclError, messagebox, ttk
 if getattr(sys, 'frozen', False):
     quanju_lujin = os.path.dirname(sys.executable)
     quanju_lujin_shang = os.path.abspath(os.path.join(quanju_lujin, os.pardir))
+    server_lujin = quanju_lujin
 else:
     quanju_lujin = os.path.dirname(os.path.abspath(sys.argv[0]))
     quanju_lujin_shang = os.path.abspath(os.path.join(quanju_lujin, os.pardir))
+    server_lujin = quanju_lujin_shang
+
+def get_config_directory():
+    """
+    获取配置文件目录，优先使用用户文档目录，失败时使用data目录
+    """
+    try:
+        # 尝试获取用户文档目录
+        documents_path = os.path.join(os.path.expanduser("~"), "Documents")
+        config_dir = os.path.join(documents_path, "HanHan_ZDserver", "data")
+        
+        # 尝试创建目录
+        os.makedirs(config_dir, exist_ok=True)
+        
+        # 测试目录是否可写
+        test_file = os.path.join(config_dir, "test_write.tmp")
+        try:
+            with open(test_file, 'w') as f:
+                f.write("test")
+            os.remove(test_file)
+            print(f"使用配置目录: {config_dir}")
+            return config_dir
+        except:
+            pass
+    except Exception as e:
+        print(f"无法使用用户文档目录: {str(e)}")
+    
+    # 回退到data目录
+    fallback_dir = os.path.join(server_lujin, "data")
+    os.makedirs(fallback_dir, exist_ok=True)
+    print(f"回退到配置目录: {fallback_dir}")
+    return fallback_dir
+
+# 获取配置目录
+config_directory = get_config_directory()
+devices_json_path = os.path.join(config_directory, "Devices.json")
 
 # 检测数据文件路径
 if not os.path.exists(f"{quanju_lujin}/data/orderlist.json"):
@@ -42,6 +79,38 @@ for path in possible_icon_paths:
         icon_path = path
         break
 
+def load_devices_config():
+    """加载设备配置文件"""
+    try:
+        if os.path.exists(devices_json_path):
+            with open(devices_json_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        else:
+            # 创建默认配置
+            default_config = {
+                "name": "仅允许授权设备",
+                "enable": "true",
+                "authorizedDevices": [],
+                "blacklistedDevices": []
+            }
+            save_devices_config(default_config)
+            return default_config
+    except Exception as e:
+        messagebox.showerror("错误", f"无法加载设备配置: {str(e)}")
+        return {
+            "name": "仅允许授权设备",
+            "enable": "true",
+            "authorizedDevices": [],
+            "blacklistedDevices": []
+        }
+
+def save_devices_config(config):
+    """保存设备配置文件"""
+    try:
+        with open(devices_json_path, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        messagebox.showerror("错误", f"无法保存设备配置: {str(e)}")
 
 class CustomDialog(tk.Toplevel):
     """自定义对话框，确保窗口大小合适"""
@@ -122,6 +191,365 @@ class CustomDialog(tk.Toplevel):
         self.result = None
         self.destroy()
 
+
+class DeviceEditDialog(tk.Toplevel):
+    """设备编辑对话框"""
+    def __init__(self, parent, title, device_id="", device_name=""):
+        super().__init__(parent)
+        self.withdraw()
+        self.title(title)
+        self.result = None
+        
+        # 设置窗口图标
+        if icon_path:
+            try:
+                self.iconbitmap(icon_path)
+            except Exception as e:
+                print(f"无法加载图标: {str(e)}")
+        
+        # 设置窗口大小
+        window_width = 400
+        window_height = 200
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        
+        # 计算屏幕中央位置
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x_cordinate = int((screen_width/2) - (window_width/2))
+        y_cordinate = int((screen_height/2) - (window_height/2))
+        
+        self.geometry(f"{window_width}x{window_height}+{x_cordinate}+{y_cordinate}")
+        
+        # 窗口布局
+        main_frame = ttk.Frame(self, padding=10)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 设备ID输入
+        ttk.Label(main_frame, text="设备ID:").pack(anchor="w", pady=(0, 5))
+        self.device_id_entry = ttk.Entry(main_frame, width=50)
+        self.device_id_entry.pack(fill="x", pady=(0, 10))
+        if device_id:
+            self.device_id_entry.insert(0, device_id)
+        
+        # 设备名称输入
+        ttk.Label(main_frame, text="设备名称:").pack(anchor="w", pady=(0, 5))
+        self.device_name_entry = ttk.Entry(main_frame, width=50)
+        self.device_name_entry.pack(fill="x", pady=(0, 15))
+        if device_name:
+            self.device_name_entry.insert(0, device_name)
+        
+        # 按钮区域
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill="x", pady=(10, 0))
+        
+        ttk.Button(button_frame, text="确定", command=self.ok_command, width=10).pack(side="left", padx=5)
+        ttk.Button(button_frame, text="取消", command=self.cancel_command, width=10).pack(side="right", padx=5)
+        
+        # 绑定事件
+        self.bind("<Return>", lambda event: self.ok_command())
+        self.bind("<Escape>", lambda event: self.cancel_command())
+        
+        self.update_idletasks()
+        self.deiconify()
+        
+        # 设置焦点
+        self.device_id_entry.focus_set()
+        
+        self.wait_window(self)
+    
+    def ok_command(self):
+        """确定按钮点击事件"""
+        device_id = self.device_id_entry.get().strip()
+        device_name = self.device_name_entry.get().strip()
+        
+        if device_id and device_name:
+            self.result = {"deviceId": device_id, "deviceName": device_name}
+        else:
+            messagebox.showwarning("警告", "请填写设备ID和设备名称")
+            return
+        
+        self.destroy()
+    
+    def cancel_command(self):
+        """取消按钮点击事件"""
+        self.result = None
+        self.destroy()
+
+class DeviceManagerDialog(tk.Toplevel):
+    """设备管理对话框"""
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.withdraw()
+        self.title("设备管理")
+        self.devices_config = load_devices_config()
+        
+        # 设置窗口图标
+        if icon_path:
+            try:
+                self.iconbitmap(icon_path)
+            except Exception as e:
+                print(f"无法加载图标: {str(e)}")
+        
+        # 设置窗口大小
+        window_width = 600
+        window_height = 500
+        self.resizable(True, True)
+        self.transient(parent)
+        self.grab_set()
+        
+        # 计算屏幕中央位置
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x_cordinate = int((screen_width/2) - (window_width/2))
+        y_cordinate = int((screen_height/2) - (window_height/2))
+        
+        self.geometry(f"{window_width}x{window_height}+{x_cordinate}+{y_cordinate}")
+        
+        self.create_widgets()
+        self.load_device_lists()
+        
+        self.update_idletasks()
+        self.deiconify()
+        
+        self.wait_window(self)
+    
+    def create_widgets(self):
+        """创建控件"""
+        main_frame = ttk.Frame(self, padding=10)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题和控制区域
+        title_frame = ttk.Frame(main_frame)
+        title_frame.pack(fill="x", pady=(0, 10))
+        
+        ttk.Label(title_frame, text="设备管理", font=('微软雅黑', 14, 'bold')).pack(side="left")
+        
+        # 右侧控制按钮
+        control_frame = ttk.Frame(title_frame)
+        control_frame.pack(side="right")
+        
+        self.enable_var = tk.StringVar(value=self.devices_config.get("enable", "true"))
+        enable_check = ttk.Checkbutton(control_frame, text="启用设备验证", 
+                                     variable=self.enable_var, 
+                                     onvalue="true", offvalue="false",
+                                     command=self.on_enable_changed)
+        enable_check.pack(side="left", padx=(0, 10))
+        
+        # 打开配置文件夹按钮
+        ttk.Button(control_frame, text="打开配置文件夹", 
+                  command=self.open_config_folder).pack(side="left")
+        
+        # 创建notebook用于标签页
+        notebook = ttk.Notebook(main_frame)
+        notebook.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        
+        # 授权设备标签页
+        self.auth_frame = ttk.Frame(notebook)
+        notebook.add(self.auth_frame, text="授权设备")
+        self.create_device_list_tab(self.auth_frame, "authorized")
+        
+        # 黑名单设备标签页
+        self.black_frame = ttk.Frame(notebook)
+        notebook.add(self.black_frame, text="黑名单设备")
+        self.create_device_list_tab(self.black_frame, "blacklisted")
+        
+        # 按钮区域
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill="x", pady=(10, 0))
+        
+        ttk.Button(button_frame, text="保存", command=self.save_and_close).pack(side="right", padx=(5, 0))
+        ttk.Button(button_frame, text="取消", command=self.destroy).pack(side="right")
+    
+    def create_device_list_tab(self, parent, device_type):
+        """创建设备列表标签页"""
+        main_container = ttk.Frame(parent)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # 列表框架
+        list_frame = ttk.Frame(main_container)
+        list_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        
+        # 设备列表
+        listbox = tk.Listbox(list_frame, height=15, font=("微软雅黑", 10))
+        listbox.pack(side="left", fill="both", expand=True)
+        
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=listbox.yview)
+        scrollbar.pack(side="right", fill="y")
+        listbox.config(yscrollcommand=scrollbar.set)
+        
+        # 双击编辑事件
+        listbox.bind("<Double-Button-1>", lambda e: self.edit_device(device_type))
+        
+        # 按钮框架
+        btn_frame = ttk.Frame(main_container)
+        btn_frame.pack(fill="x")
+        
+        ttk.Button(btn_frame, text="添加设备", 
+                  command=lambda: self.add_device(device_type)).pack(side="left", padx=(0, 5))
+        
+        ttk.Button(btn_frame, text="编辑设备", 
+                  command=lambda: self.edit_device(device_type)).pack(side="left", padx=(0, 5))
+        
+        ttk.Button(btn_frame, text="删除设备", 
+                  command=lambda: self.remove_device(device_type)).pack(side="left")
+        
+        # 保存listbox引用
+        if device_type == "authorized":
+            self.auth_listbox = listbox
+        else:
+            self.black_listbox = listbox
+    
+    def load_device_lists(self):
+        """加载设备列表"""
+        # 加载授权设备
+        self.auth_listbox.delete(0, tk.END)
+        for device in self.devices_config.get("authorizedDevices", []):
+            if isinstance(device, dict):
+                display_text = f"{device.get('deviceName', '未知设备')} ({device.get('deviceId', '未知ID')})"
+            else:
+                # 兼容旧格式
+                display_text = str(device)
+            self.auth_listbox.insert(tk.END, display_text)
+        
+        # 加载黑名单设备
+        self.black_listbox.delete(0, tk.END)
+        for device in self.devices_config.get("blacklistedDevices", []):
+            if isinstance(device, dict):
+                display_text = f"{device.get('deviceName', '未知设备')} ({device.get('deviceId', '未知ID')})"
+            else:
+                # 兼容旧格式
+                display_text = str(device)
+            self.black_listbox.insert(tk.END, display_text)
+    
+    def add_device(self, device_type):
+        """添加设备"""
+        dialog = DeviceEditDialog(self, "添加设备")
+        device_info = dialog.result
+        
+        if device_info:
+            key = "authorizedDevices" if device_type == "authorized" else "blacklistedDevices"
+            listbox = self.auth_listbox if device_type == "authorized" else self.black_listbox
+            
+            # 检查设备ID是否已存在
+            existing_ids = []
+            for device in self.devices_config[key]:
+                if isinstance(device, dict):
+                    existing_ids.append(device.get('deviceId', ''))
+                else:
+                    existing_ids.append(str(device))
+            
+            if device_info['deviceId'] not in existing_ids:
+                self.devices_config[key].append(device_info)
+                display_text = f"{device_info['deviceName']} ({device_info['deviceId']})"
+                listbox.insert(tk.END, display_text)
+                # 选中新添加的项目
+                listbox.selection_clear(0, tk.END)
+                listbox.select_set(tk.END)
+                listbox.see(tk.END)
+            else:
+                messagebox.showwarning("警告", "该设备ID已存在")
+    
+    def remove_device(self, device_type):
+        """删除设备"""
+        listbox = self.auth_listbox if device_type == "authorized" else self.black_listbox
+        selection = listbox.curselection()
+        
+        if selection:
+            index = selection[0]
+            key = "authorizedDevices" if device_type == "authorized" else "blacklistedDevices"
+            device = self.devices_config[key][index]
+            
+            if isinstance(device, dict):
+                device_name = device.get('deviceName', '未知设备')
+            else:
+                device_name = str(device)
+            
+            confirm = messagebox.askyesno("确认删除", f"确定要删除设备 {device_name} 吗？")
+            if confirm:
+                del self.devices_config[key][index]
+                listbox.delete(index)
+                # 选中删除后的下一个项目
+                if index < listbox.size():
+                    listbox.select_set(index)
+                elif listbox.size() > 0:
+                    listbox.select_set(index - 1)
+        else:
+            messagebox.showwarning("警告", "请先选择要删除的设备")
+    
+    def edit_device(self, device_type):
+        """编辑设备"""
+        listbox = self.auth_listbox if device_type == "authorized" else self.black_listbox
+        selection = listbox.curselection()
+        
+        if selection:
+            index = selection[0]
+            key = "authorizedDevices" if device_type == "authorized" else "blacklistedDevices"
+            old_device = self.devices_config[key][index]
+            
+            # 获取旧设备信息
+            if isinstance(old_device, dict):
+                old_device_id = old_device.get('deviceId', '')
+                old_device_name = old_device.get('deviceName', '')
+            else:
+                # 兼容旧格式
+                old_device_id = str(old_device)
+                old_device_name = str(old_device)
+            
+            dialog = DeviceEditDialog(self, "编辑设备", old_device_id, old_device_name)
+            new_device_info = dialog.result
+            
+            if new_device_info:
+                # 检查新设备ID是否与其他设备冲突
+                existing_ids = []
+                for i, device in enumerate(self.devices_config[key]):
+                    if i != index:  # 排除当前编辑的设备
+                        if isinstance(device, dict):
+                            existing_ids.append(device.get('deviceId', ''))
+                        else:
+                            existing_ids.append(str(device))
+                
+                if new_device_info['deviceId'] not in existing_ids:
+                    # 更新配置
+                    self.devices_config[key][index] = new_device_info
+                    # 更新列表显示
+                    display_text = f"{new_device_info['deviceName']} ({new_device_info['deviceId']})"
+                    listbox.delete(index)
+                    listbox.insert(index, display_text)
+                    listbox.select_set(index)
+                else:
+                    messagebox.showwarning("警告", "该设备ID已存在")
+        else:
+            messagebox.showwarning("警告", "请先选择要编辑的设备")
+    
+    def open_config_folder(self):
+        """打开配置文件夹"""
+        try:
+            import platform
+            import subprocess
+            
+            system = platform.system()
+            if system == "Windows":
+                # 修复Windows路径问题
+                subprocess.run(f'explorer "{config_directory}"', shell=True, check=False)
+            elif system == "Darwin":  # macOS
+                subprocess.run(["open", config_directory], check=True)
+            else:  # Linux
+                subprocess.run(["xdg-open", config_directory], check=True)
+        except Exception as e:
+            # 即使出错也尝试显示路径信息
+            messagebox.showinfo("配置文件夹路径", f"配置文件夹位置:\n{config_directory}")
+    
+    def on_enable_changed(self):
+        """启用状态改变事件"""
+        self.devices_config["enable"] = self.enable_var.get()
+    
+    def save_and_close(self):
+        """保存并关闭"""
+        save_devices_config(self.devices_config)
+        messagebox.showinfo("保存成功", "设备配置已保存")
+        self.destroy()
 
 class App(tk.Frame):
     def __init__(self, master=None):
@@ -237,6 +665,13 @@ class App(tk.Frame):
         
         self.move_down_button = ttk.Button(move_frame, text="下移", command=self.move_down, state="disabled")
         self.move_down_button.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        
+        # 第四组按钮：系统管理
+        system_frame = ttk.LabelFrame(button_frame, text="系统管理")
+        system_frame.pack(fill="x", pady=(0, 10), padx=5)
+        
+        self.device_manager_button = ttk.Button(system_frame, text="设备管理", command=self.open_device_manager)
+        self.device_manager_button.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
 
     def toggle_lock(self):
         """切换锁定状态"""
@@ -456,6 +891,10 @@ class App(tk.Frame):
         self.move_up_button.config(state="normal" if index > 0 else "disabled")
         self.move_down_button.config(state="normal" if index < len(self.data) - 1 else "disabled")
 
+    def open_device_manager(self):
+        """打开设备管理器"""
+        DeviceManagerDialog(self.master)
+
     def import_from_clipboard(self):
         """从剪贴板导入命令"""
         try:
@@ -541,6 +980,10 @@ class App(tk.Frame):
 
 def main():
     root = tk.Tk()
+    
+    # 立即隐藏窗口，避免闪烁
+    root.withdraw()
+    
     root.title("终端命令编辑器")
     
     # 设置窗口图标
@@ -552,7 +995,7 @@ def main():
     
     # 设置窗口大小
     window_width = 780
-    window_height = 550
+    window_height = 630
     root.minsize(600, 400)
     
     # 计算屏幕中央位置
@@ -564,7 +1007,15 @@ def main():
     # 设置窗口位置到屏幕中央
     root.geometry(f"{window_width}x{window_height}+{x_cordinate}+{y_cordinate}")
     
+    # 创建应用实例
     app = App(master=root)
+    
+    # 确保所有几何计算完成
+    root.update_idletasks()
+    
+    # 配置完成后显示窗口
+    root.deiconify()
+    
     app.mainloop()
 
 

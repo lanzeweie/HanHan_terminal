@@ -40,6 +40,7 @@
 **启动**      请先用终端进入当前目录   
 默认使用 端口 _5201_ 与 _5202_   
 端口 _5201_ 用于被移动端发现  _5202_ 用于开放API服务  
+5201为UDP
 `python ZDserver.py`  
 
 在右下角小任务栏找到此程序右键操作即可  
@@ -58,12 +59,15 @@
 ./涵涵的超级控制终端    
 ├── data/                 --数据    
 │   ├── orderlist.json    --功能配置     
-│   └── zhou.png          --图标  
+│   ├── zhou.png          --图标  
 │   └── Devices.json      --设备验证    
 ├── log/                  --日志    
 │   └── last.log          --当前日志，会自动打包上一次的日志     
 ├── app/                  --一些可用上的辅助程序         
 │   └── Custom_command_editor.py          --快捷命令菜单编辑器      
+├── COM/                  --COM线锁多线程         
+│   ├── com_protection_system.py      --全面的COM崩溃防护系统  
+│   └── com_worker_isolated.py    --COM操作工作进程    
 ├── requirements.txt      --所需库      
 ├── REMDAD.md     
 ├── WinDC.py              --底层基层命令    

@@ -262,14 +262,42 @@ class Taskbar():
 
     def app_open_customeditor_menu(server_lujin):
         def run_editor():
-            if not os.path.exists(f"{server_lujin}/Custom_command_editor.exe"):
-                if not os.path.exists(f"{server_lujin}/app/Custom_command_editor.exe"):
-                    messagebox.showinfo("终端命令编辑器", "应用程序不存在，请勿删除自带文件")
+            try:
+                # 检查模块文件是否存在
+                module_path = os.path.join(server_lujin, "app", "Custom_command_editor.py")
+                if not os.path.exists(module_path):
+                    # 兼容旧版本，检查根目录下的py文件
+                    module_path = os.path.join(server_lujin, "Custom_command_editor.py")
+                    if not os.path.exists(module_path):
+                        messagebox.showinfo("终端命令编辑器", "自定义命令编辑器模块不存在，请勿删除自带文件")
+                        return "not"
+                
+                # 动态导入并运行模块
+                import importlib.util
+                import sys
+
+                # 将模块所在目录添加到sys.path
+                module_dir = os.path.dirname(module_path)
+                if module_dir not in sys.path:
+                    sys.path.insert(0, module_dir)
+                
+                # 动态加载模块
+                spec = importlib.util.spec_from_file_location("custom_command_editor", module_path)
+                if spec is None:
+                    messagebox.showinfo("终端命令编辑器", "无法加载自定义命令编辑器模块")
                     return "not"
+                
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                
+                # 运行主函数
+                if hasattr(module, 'main'):
+                    module.main()
                 else:
-                    subprocess.Popen(f'{server_lujin}/app/Custom_command_editor.exe', shell=True)
-            else:
-                subprocess.Popen(f'{server_lujin}/Custom_command_editor.exe', shell=True)
+                    messagebox.showinfo("终端命令编辑器", "自定义命令编辑器模块格式错误")
+                    
+            except Exception as e:
+                messagebox.showinfo("终端命令编辑器", f"启动自定义命令编辑器时发生错误：{str(e)}")
         
         thread = threading.Thread(target=run_editor)
         thread.start()
