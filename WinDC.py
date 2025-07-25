@@ -45,14 +45,100 @@ def center_window(window, width, height):
     y_coordinate = (screen_height - height) // 2
     window.geometry(f"{width}x{height}+{x_coordinate}+{y_coordinate}")
 
+def get_config_directory():
+    """
+    获取配置文件目录，优先使用用户文档目录，失败时使用data目录
+    """
+    try:
+        # 尝试获取用户文档目录
+        documents_path = os.path.join(os.path.expanduser("~"), "Documents")
+        config_dir = os.path.join(documents_path, "HanHan_ZDserver", "data")
+        
+        # 尝试创建目录
+        os.makedirs(config_dir, exist_ok=True)
+        
+        # 测试目录是否可写
+        test_file = os.path.join(config_dir, "test_write.tmp")
+        try:
+            with open(test_file, 'w') as f:
+                f.write("test")
+            os.remove(test_file)
+            print(f"使用配置目录: {config_dir}")
+            return config_dir
+        except:
+            pass
+    except Exception as e:
+        print(f"无法使用用户文档目录: {str(e)}")
+    
+    # 回退到data目录
+    fallback_dir = os.path.join(server_lujin, "data")
+    os.makedirs(fallback_dir, exist_ok=True)
+    print(f"回退到配置目录: {fallback_dir}")
+    return fallback_dir
+
+def migrate_old_config():
+    """
+    迁移旧的data目录配置到新的用户文档目录
+    """
+    try:
+        old_data_dir = os.path.join(server_lujin, "data")
+        new_config_dir = get_config_directory()
+        
+        # 如果新目录就是data目录，不需要迁移
+        if os.path.abspath(old_data_dir) == os.path.abspath(new_config_dir):
+            return
+        
+        # 如果旧目录不存在，不需要迁移
+        if not os.path.exists(old_data_dir):
+            return
+        
+        # 迁移文件列表
+        files_to_migrate = [
+            "orderlist.json",
+            "id.json", 
+            "Devices.json",
+            "audio_brightness_cache.json",
+            "config.json"
+        ]
+        
+        migrated_files = []
+        for filename in files_to_migrate:
+            old_file = os.path.join(old_data_dir, filename)
+            new_file = os.path.join(new_config_dir, filename)
+            
+            # 只有当旧文件存在且新文件不存在时才迁移
+            if os.path.exists(old_file) and not os.path.exists(new_file):
+                try:
+                    import shutil
+                    shutil.copy2(old_file, new_file)
+                    migrated_files.append(filename)
+                except Exception as e:
+                    print(f"迁移文件 {filename} 失败: {str(e)}")
+        
+        if migrated_files:
+            print(f"已迁移配置文件: {', '.join(migrated_files)}")
+    except Exception as e:
+        print(f"配置迁移过程出错: {str(e)}")
+
 ############################
 #配置文件
-config_orderlist = "data\\orderlist.json"
+config_orderlist = "orderlist.json"
 ############################
 if getattr(sys, 'frozen', False):
     server_lujin = os.path.dirname(sys.executable)
 else:
     server_lujin = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+# 初始化配置目录
+config_directory = None
+
+def init_config_directory():
+    """初始化配置目录"""
+    global config_directory
+    if config_directory is None:
+        migrate_old_config()  # 先迁移旧配置
+        config_directory = get_config_directory()
+    return config_directory
 
 class PPowerShell():
     # 添加静态变量跟踪上次更新时间
@@ -92,7 +178,8 @@ class PPowerShell():
         need_update = False
         try:
             # 使用配置文件缓存的方式而非直接COM调用
-            config_cache_path = f'{server_lujin}{os.sep}data{os.sep}audio_brightness_cache.json'
+            config_dir = init_config_directory()
+            config_cache_path = os.path.join(config_dir, 'audio_brightness_cache.json')
             
             # 尝试读取缓存文件中的值
             current_volume = None
@@ -113,7 +200,8 @@ class PPowerShell():
                     print(f"读取音量亮度缓存出错: {str(e)}")
             
             # 读取orderlist数据
-            with open(f'{server_lujin}{os.sep}{config_orderlist}', 'r', encoding='utf-8') as file:
+            orderlist_path = os.path.join(config_dir, config_orderlist)
+            with open(orderlist_path, 'r', encoding='utf-8') as file:
                 data = json.load(file)
             
             # 更新数据项
@@ -130,7 +218,7 @@ class PPowerShell():
             
             # 只有在需要更新时才写入文件
             if need_update:
-                with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
+                with open(orderlist_path, 'w', encoding='utf-8') as file:
                     json.dump(data, file, indent=2, ensure_ascii=False)
                 print("配置文件已更新音量和亮度值")
         except Exception as e:
@@ -142,7 +230,8 @@ class PPowerShell():
         更新音量亮度缓存文件，在成功控制音量亮度后调用
         """
         try:
-            cache_path = f'{server_lujin}{os.sep}data{os.sep}audio_brightness_cache.json'
+            config_dir = init_config_directory()
+            cache_path = os.path.join(config_dir, 'audio_brightness_cache.json')
             cache_data = {}
             
             # 先读取现有缓存
@@ -173,7 +262,9 @@ class PPowerShell():
         #----------历史屎坑--------如果去除它则无法运行
         PPowerShell.get_ipv4_address()
         #----------历史屎坑--------如果去除它则无法运行
-        with open(f'{server_lujin}{os.sep}{config_orderlist}', 'r', encoding='utf-8') as file:
+        config_dir = init_config_directory()
+        orderlist_path = os.path.join(config_dir, config_orderlist)
+        with open(orderlist_path, 'r', encoding='utf-8') as file:
             data = json.load(file)
         for item in data:
             if item['guding'] == 'n':
@@ -183,13 +274,15 @@ class PPowerShell():
                     formatted_address = address.replace(address, f'{ipv4}:{port+1}')
                     item['apiUrl'] = item['apiUrl'].replace(address, formatted_address)
 
-        with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
+        with open(orderlist_path, 'w', encoding='utf-8') as file:
             json.dump(data, file, indent=2, ensure_ascii=False)
         print("读取了配置文件")
 
     def file_json_geshihua_prot(port):
          #格式化data json数据，设置为启动端口
-        with open(f'{server_lujin}{os.sep}{config_orderlist}', 'r', encoding='utf-8') as file:
+        config_dir = init_config_directory()
+        orderlist_path = os.path.join(config_dir, config_orderlist)
+        with open(orderlist_path, 'r', encoding='utf-8') as file:
             data = json.load(file)
         for item in data:
             if item['guding'] == 'n':
@@ -202,23 +295,18 @@ class PPowerShell():
                         end_index = len(url)
                     new_url = url[:start_index] + f"{port+1}" + url[end_index:]
                     item['apiUrl'] = new_url
-        with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
+        with open(orderlist_path, 'w', encoding='utf-8') as file:
             json.dump(data, file, indent=2, ensure_ascii=False)
         print("配置文件更新完成")
 
     def check_files_and_dirs(app_name, app_file,server_lujin):
-        files_and_dirs = [f"{server_lujin}{os.sep}data"]
-        for item in files_and_dirs:  
-            if os.path.exists(item):  
-                pass  
-            else:  
-                print(f"缺失{item}")
-                messagebox.showinfo("涵涵的控制终端核心", f"缺失{item}")  
-                os._exit(1)  # 添加退出代码
-        print("\n环境已检查：正常")
+        # 初始化配置目录
+        config_dir = init_config_directory()
         
-        # 检查data/id.json文件是否存在，不存在则创建
-        id_json_path = f"{server_lujin}{os.sep}data{os.sep}id.json"
+        print(f"\n环境已检查：正常，配置目录: {config_dir}")
+        
+        # 检查id.json文件是否存在，不存在则创建
+        id_json_path = os.path.join(config_dir, "id.json")
         if not os.path.exists(id_json_path):
             print(f"创建{id_json_path}")
             try:
@@ -230,15 +318,16 @@ class PPowerShell():
                 os._exit(1)
                 
         # 是否第一次启动 设置第一次启动自行开启开机启动
-        if os.path.exists(f"{server_lujin}{os.sep}data{os.sep}one"):
+        one_file_path = os.path.join(config_dir, "one")
+        if os.path.exists(one_file_path):
             pass
         else:
-            with open(f"{server_lujin}{os.sep}data{os.sep}one", "w") as file:
+            with open(one_file_path, "w") as file:
                 pass
             Taskbar.command_bootup_menu_add_to_startup(app_name, f"{server_lujin}{os.sep}{app_file}")
         print(f"{server_lujin}{os.sep}{app_file}")
         # 检查是否需要设置设备名
-        with open(f"{server_lujin}{os.sep}data{os.sep}id.json", 'r', encoding='utf-8') as file:
+        with open(id_json_path, 'r', encoding='utf-8') as file:
             data = json.load(file)
 
         if data.get('name', '') == '':
@@ -252,21 +341,22 @@ class PPowerShell():
                     
                     try:
                         # 修改 id.json
-                        with open(f'{server_lujin}{os.sep}data{os.sep}id.json', 'r', encoding='utf-8') as id_file:
+                        with open(id_json_path, 'r', encoding='utf-8') as id_file:
                             id_data = json.load(id_file)
                         id_data['name'] = user_input
-                        with open(f'{server_lujin}{os.sep}data{os.sep}id.json', 'w', encoding='utf-8') as id_file:
+                        with open(id_json_path, 'w', encoding='utf-8') as id_file:
                             json.dump(id_data, id_file, indent=2, ensure_ascii=False)
                         
                         # 修改 orderlist.json
                         try:
-                            with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'r', encoding='utf-8') as f:
+                            orderlist_path = os.path.join(config_dir, 'orderlist.json')
+                            with open(orderlist_path, 'r', encoding='utf-8') as f:
                                 orderlist_data = json.load(f)
                             # 添加 try 是为了让 orderlist 中显示设备名 
                             try:
                                 if orderlist_data[0]['//1'] == '以上是标题,可以在任务栏中修改':
                                     orderlist_data[0]['title'] = f"{user_input}"
-                                    with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'w', encoding='utf-8') as f:
+                                    with open(orderlist_path, 'w', encoding='utf-8') as f:
                                         json.dump(orderlist_data, f, indent=2, ensure_ascii=False)
                             except:
                                 pass
@@ -367,7 +457,7 @@ class PPowerShell():
             device_name_set = create_device_name_window()
             # 设置完成后，再次检查设备名是否已成功设置
             try:
-                with open(f"{server_lujin}{os.sep}data{os.sep}id.json", 'r', encoding='utf-8') as file:
+                with open(id_json_path, 'r', encoding='utf-8') as file:
                     data = json.load(file)
                 
                 if data.get('name', '') == '':
@@ -407,7 +497,9 @@ class PPowerShell():
     def verify_device(json_data, device_lock):
         client_ip = request.remote_addr
         current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        with open(f'{server_lujin}{os.sep}data{os.sep}Devices.json', 'r', encoding='utf-8') as file:
+        config_dir = init_config_directory()
+        devices_path = os.path.join(config_dir, 'Devices.json')
+        with open(devices_path, 'r', encoding='utf-8') as file:
             config = json.load(file)
         enable = config.get("enable", "false").lower() == "true"
 
@@ -460,12 +552,12 @@ class PPowerShell():
                     if choice == "trust":
                         authorized_devices.append({"deviceId": device_id, "deviceName": model_id})
                         config["authorizedDevices"] = authorized_devices
-                        with open('data/Devices.json', 'w', encoding='utf-8') as f:
+                        with open(devices_path, 'w', encoding='utf-8') as f:
                             json.dump(config, f, ensure_ascii=False, indent=4)
                     elif choice == "blacklist":
                         blacklisted_devices.append({"deviceId": device_id, "deviceName": model_id})
                         config["blacklistedDevices"] = blacklisted_devices
-                        with open('data/Devices.json', 'w', encoding='utf-8') as f:
+                        with open(devices_path, 'w', encoding='utf-8') as f:
                             json.dump(config, f, ensure_ascii=False, indent=4)
                         response = {
                             "title": "命令返回状态",
@@ -643,7 +735,8 @@ class PPowerShell():
                     print(f"获取音量失败: {str(e)}")
                     # 尝试从缓存读取
                     try:
-                        cache_path = f'{server_lujin}{os.sep}data{os.sep}audio_brightness_cache.json'
+                        config_dir = init_config_directory()
+                        cache_path = os.path.join(config_dir, 'audio_brightness_cache.json')
                         if os.path.exists(cache_path):
                             with open(cache_path, 'r', encoding='utf-8') as f:
                                 cache_data = json.load(f)
@@ -689,7 +782,8 @@ class PPowerShell():
                         print(f"获取亮度失败: {str(e)}")
                     # 尝试从缓存读取
                     try:
-                        cache_path = f'{server_lujin}{os.sep}data{os.sep}audio_brightness_cache.json'
+                        config_dir = init_config_directory()
+                        cache_path = os.path.join(config_dir, 'audio_brightness_cache.json')
                         if os.path.exists(cache_path):
                             with open(cache_path, 'r', encoding='utf-8') as f:
                                 cache_data = json.load(f)
@@ -712,7 +806,9 @@ class PPowerShell():
             # 4. 更新orderlist数据
             need_update = False
             try:
-                with open(f'{server_lujin}{os.sep}{config_orderlist}', 'r', encoding='utf-8') as file:
+                config_dir = init_config_directory()
+                orderlist_path = os.path.join(config_dir, config_orderlist)
+                with open(orderlist_path, 'r', encoding='utf-8') as file:
                     data = json.load(file)
                 
                 for item in data:
@@ -727,7 +823,7 @@ class PPowerShell():
                             need_update = True
                 
                 if need_update:
-                    with open(f'{server_lujin}{os.sep}{config_orderlist}', 'w', encoding='utf-8') as file:
+                    with open(orderlist_path, 'w', encoding='utf-8') as file:
                         json.dump(data, file, indent=2, ensure_ascii=False)
                     print("配置文件已更新音量和亮度值")
                     

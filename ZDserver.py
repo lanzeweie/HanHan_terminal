@@ -19,7 +19,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from waitress import serve
 
-from WinDC import PPowerShell
+from WinDC import PPowerShell, init_config_directory
 from WinTaskbar import Taskbar
 
 # 初始化环境判断
@@ -34,14 +34,15 @@ print(f"当前工作目录: {server_lujin}")
 log_file = "last.log"
 app_file = os.path.basename(sys.argv[0])
 zip_file_name = time.strftime("%Y_%m_%d_%H_%M_%S") + ".zip"
-if os.path.exists(f"{server_lujin}{os.sep}log{os.sep}{log_file}"):
-    with zipfile.ZipFile(f"{server_lujin}{os.sep}log{os.sep}{zip_file_name}", 'w') as zf:
-        zf.write(f"{server_lujin}{os.sep}log{os.sep}{log_file}", arcname=log_file)
+log_dir = f"{server_lujin}{os.sep}log"
+os.makedirs(log_dir, exist_ok=True)
+if os.path.exists(f"{log_dir}{os.sep}{log_file}"):
+    with zipfile.ZipFile(f"{log_dir}{os.sep}{zip_file_name}", 'w') as zf:
+        zf.write(f"{log_dir}{os.sep}{log_file}", arcname=log_file)
 else:
-    os.makedirs(f"{server_lujin}{os.sep}log", exist_ok=True)
-    with open(f"{server_lujin}{os.sep}log{os.sep}{log_file}", "w") as f:
+    with open(f"{log_dir}{os.sep}{log_file}", "w") as f:
         f.write("")
-log_file_name = f"{server_lujin}{os.sep}log{os.sep}{log_file}"
+log_file_name = f"{log_dir}{os.sep}{log_file}"
 
 app = Flask(__name__)
 CORS(app)
@@ -81,9 +82,10 @@ class FlaskAPIWeb:
         current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         log_msg = f"【{current_time}】[控制台]: 设备 {client_ip} 访问name接口\n"
         print(log_msg)
-        with open(f"{server_lujin}/log/{log_file}", "a", encoding="utf-8") as f:
+        with open(log_file_name, "a", encoding="utf-8") as f:
             f.write(log_msg)
-        id_path = os.path.join(server_lujin, "data", "id.json")
+        config_dir = init_config_directory()
+        id_path = os.path.join(config_dir, "id.json")
         with open(id_path, "r", encoding="utf-8") as f:
             id_data = json.load(f)
             name = id_data.get("name", "")
@@ -113,7 +115,8 @@ class FlaskAPIWeb:
             update_thread.start()
             update_thread.join(timeout=1.0)
 
-            json_file_path = os.path.join(server_lujin, "data", "orderlist.json")
+            config_dir = init_config_directory()
+            json_file_path = os.path.join(config_dir, "orderlist.json")
             with open(json_file_path, "r", encoding="utf-8") as json_file:
                 response = json.load(json_file)
                 return jsonify(response)
@@ -171,7 +174,8 @@ class FlaskAPIWeb:
                 if data_command == "python_volume_control_success":
                     cmd_back = f"已成功将系统音量设置为{data_value}%"
                     # 更新orderlist数据
-                    orderlist_path = os.path.join(server_lujin, "data", "orderlist.json")
+                    config_dir = init_config_directory()
+                    orderlist_path = os.path.join(config_dir, "orderlist.json")
                     with open(orderlist_path, 'r+', encoding='utf-8') as f:
                         orderlist_data = json.load(f)
                         for item in orderlist_data:
@@ -182,7 +186,8 @@ class FlaskAPIWeb:
                         f.truncate()
                 elif data_command == "python_brightness_control_success":
                     cmd_back = f"已成功将屏幕亮度设置为{data_value}%"
-                    orderlist_path = os.path.join(server_lujin, "data", "orderlist.json")
+                    config_dir = init_config_directory()
+                    orderlist_path = os.path.join(config_dir, "orderlist.json")
                     with open(orderlist_path, 'r+', encoding='utf-8') as f:
                         orderlist_data = json.load(f)
                         for item in orderlist_data:
@@ -217,7 +222,8 @@ class FlaskAPIWeb:
     async def check_ipv4_dynamic_state_async(port, taskbar_instance, loop):
         """异步IP地址变化检测"""
         last_ip = PPowerShell.get_ipv4_now()
-        cache_path = f'{server_lujin}{os.sep}data{os.sep}audio_brightness_cache.json'
+        config_dir = init_config_directory()
+        cache_path = os.path.join(config_dir, 'audio_brightness_cache.json')
         
         if not os.path.exists(cache_path):
             try:
@@ -257,7 +263,8 @@ class ServerBasics:
                     current_time = datetime.datetime.now().strftime('[%Y-%m-%d %H:%M:%S]')
                     print(f"【{current_time}】已被设备 {client_address} 发现")
                     # UDP响应设备名称
-                    id_path = os.path.join(server_lujin, "data", "id.json")
+                    config_dir = init_config_directory()
+                    id_path = os.path.join(config_dir, "id.json")
                     with open(id_path, "r", encoding="utf-8") as f:
                         id_data = json.load(f)
                     name = id_data.get("name", "")
@@ -283,7 +290,8 @@ if __name__ == '__main__':
     original_brightness_control = PPowerShell.control_system_brightness
 
     def patched_volume_control(volume):
-        config_path = f"{server_lujin}{os.sep}data{os.sep}config.json"
+        config_dir = init_config_directory()
+        config_path = os.path.join(config_dir, "config.json")
         if os.path.exists(config_path):
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
@@ -292,7 +300,8 @@ if __name__ == '__main__':
         return original_volume_control(volume)
 
     def patched_brightness_control(brightness):
-        config_path = f"{server_lujin}{os.sep}data{os.sep}config.json"
+        config_dir = init_config_directory()
+        config_path = os.path.join(config_dir, "config.json")
         if os.path.exists(config_path):
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
@@ -312,6 +321,18 @@ if __name__ == '__main__':
     # 任务栏初始化
     print("启动Windows任务栏组件")
     Taskbar_start = Taskbar(server_lujin, app_name, app_file, PPowerShell.get_ipv4_now(), port)
+    
+    # 添加 update_ip 方法到 Taskbar 类（如果不存在）
+    if not hasattr(Taskbar_start, 'update_ip'):
+        def update_ip(self, new_ip):
+            """更新IP地址并刷新任务栏显示"""
+            self.ipv4_ip = new_ip
+            self.icon_dongtai(new_ip, self.port)
+        
+        # 动态添加方法
+        import types
+        Taskbar_start.update_ip = types.MethodType(update_ip, Taskbar_start)
+    
     taskbar_loop = asyncio.new_event_loop()
     taskbar_thread = threading.Thread(
         target=lambda: taskbar_loop.run_until_complete(Taskbar_start.chushihua_async(taskbar_loop)),

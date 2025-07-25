@@ -289,7 +289,10 @@ class Taskbar():
 
     #--------------------------------------------获得设备名字与修改设备名-------------------------------------------------------------
     def shebei_name(server_lujin):
-        with open(f'{server_lujin}/data/id.json', 'r', encoding='utf-8') as f:
+        from WinDC import init_config_directory
+        config_dir = init_config_directory()
+        id_path = os.path.join(config_dir, 'id.json')
+        with open(id_path, 'r', encoding='utf-8') as f:
             id_data = json.load(f)
         title = id_data['name']
         return title
@@ -301,22 +304,27 @@ class Taskbar():
                 if user_input.strip() == "":
                     messagebox.showinfo("涵涵的控制终端", "不能输入空值")
                 else:
+                    from WinDC import init_config_directory
+                    config_dir = init_config_directory()
+                    
                     # 修改 orderlist.json
-                    with open(f'{server_lujin}/data/orderlist.json', 'r', encoding='utf-8') as f:
+                    orderlist_path = os.path.join(config_dir, 'orderlist.json')
+                    with open(orderlist_path, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     # 添加 try 是为了让 orderlist 中显示设备名 可以不存在 因为新版本添加了 id.json 专门用来储存设备名  用户可以选择去除 orderlist 当然，默认是存在的
                     try:
                         if data[0]['//1'] == '以上是标题,可以在任务栏中修改':
                             data[0]['title'] = f"{user_input}"
-                            with open(f'{server_lujin}/data/orderlist.json', 'w', encoding='utf-8') as f:
+                            with open(orderlist_path, 'w', encoding='utf-8') as f:
                                 json.dump(data, f, indent=2, ensure_ascii=False)
                     except:
                         pass
                     # 修改 id.json
-                    with open(f'{server_lujin}/data/id.json', 'r', encoding='utf-8') as id_file:
+                    id_path = os.path.join(config_dir, 'id.json')
+                    with open(id_path, 'r', encoding='utf-8') as id_file:
                         id_data = json.load(id_file)
                     id_data['name'] = user_input  # 更新name字段
-                    with open(f'{server_lujin}/data/id.json', 'w', encoding='utf-8') as id_file:
+                    with open(id_path, 'w', encoding='utf-8') as id_file:
                         json.dump(id_data, id_file, indent=2, ensure_ascii=False)
                     
                     messagebox.showinfo("涵涵的控制终端", "设备名已修改成功！")
@@ -346,7 +354,10 @@ class Taskbar():
             
             # 获取当前设备名以预填充输入框
             try:
-                with open(f'{server_lujin}/data/id.json', 'r', encoding='utf-8') as id_file:
+                from WinDC import init_config_directory
+                config_dir = init_config_directory()
+                id_path = os.path.join(config_dir, 'id.json')
+                with open(id_path, 'r', encoding='utf-8') as id_file:
                     id_data = json.load(id_file)
                     current_name = id_data.get('name', '')
                     if current_name:
@@ -449,7 +460,9 @@ class Taskbar():
         return startup_wenbenzhi_wenben
     
     def command_AudioBrightnes_menu_check_startup(app_name,server_lujin):
-        file_path = f'{server_lujin}{os.sep}data{os.sep}orderlist.json'
+        from WinDC import init_config_directory
+        config_dir = init_config_directory()
+        file_path = os.path.join(config_dir, 'orderlist.json')
         if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
             return "null"
             
@@ -473,7 +486,10 @@ class Taskbar():
             Taskbar.meun_dongtai(app_name, server_lujin,app_file)
 
     def command_AudioBrightnes_menu_remove_from_startup(app_name, server_lujin):
-        with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'r', encoding='utf-8') as file:
+        from WinDC import init_config_directory
+        config_dir = init_config_directory()
+        orderlist_path = os.path.join(config_dir, 'orderlist.json')
+        with open(orderlist_path, 'r', encoding='utf-8') as file:
             data = json.load(file)
         item_to_remove = None
         for item in data:
@@ -482,7 +498,7 @@ class Taskbar():
                 break
         if item_to_remove:
             data.remove(item_to_remove)
-        with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'w', encoding='utf-8') as file:
+        with open(orderlist_path, 'w', encoding='utf-8') as file:
             json.dump(data, file, ensure_ascii=False, indent=2)
                 
 
@@ -491,7 +507,8 @@ class Taskbar():
             # 检查屏幕是否支持亮度控制
             try:
                 # 避免循环导入，在函数内部导入
-                from WinDC import BRIGHTNESS_AVAILABLE, PPowerShell
+                from WinDC import (BRIGHTNESS_AVAILABLE, PPowerShell,
+                                   init_config_directory)
 
                 # 首先检查必要的库是否已安装
                 if not BRIGHTNESS_AVAILABLE:
@@ -518,8 +535,11 @@ class Taskbar():
             
             # 屏幕支持亮度控制，添加功能
             try:
+                config_dir = init_config_directory()
+                orderlist_path = os.path.join(config_dir, 'orderlist.json')
+                
                 # 先检查是否已存在亮度控制命令
-                with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'r', encoding='utf-8') as file:
+                with open(orderlist_path, 'r', encoding='utf-8') as file:
                     data = json.load(file)
                 
                 # 检查是否已存在亮度控制
@@ -547,7 +567,7 @@ class Taskbar():
                 if not found_audio_control:
                     data.append(new_item)
                 
-                with open(f'{server_lujin}{os.sep}data{os.sep}orderlist.json', 'w', encoding='utf-8') as file:
+                with open(orderlist_path, 'w', encoding='utf-8') as file:
                     json.dump(data, file, ensure_ascii=False, indent=2)
                     
                 # 添加成功后更新菜单状态并显示消息
@@ -647,7 +667,10 @@ class Taskbar():
         return startup_wenbenzhi_wenben
     
     def command_devices_menu_check_startup(app_name,server_lujin):
-        with open(f'{server_lujin}{os.sep}data{os.sep}Devices.json', 'r', encoding='utf-8') as file:
+        from WinDC import init_config_directory
+        config_dir = init_config_directory()
+        devices_path = os.path.join(config_dir, 'Devices.json')
+        with open(devices_path, 'r', encoding='utf-8') as file:
             data = json.load(file)
         if data['enable'] == "true":
             return "surr"
@@ -663,16 +686,22 @@ class Taskbar():
             Taskbar.meun_dongtai(app_name, server_lujin,app_file)
 
     def command_devices_menu_remove_from_startup(app_name, server_lujin):
-        with open(f'{server_lujin}{os.sep}data{os.sep}Devices.json', 'r', encoding='utf-8') as file:
+        from WinDC import init_config_directory
+        config_dir = init_config_directory()
+        devices_path = os.path.join(config_dir, 'Devices.json')
+        with open(devices_path, 'r', encoding='utf-8') as file:
             data = json.load(file)
         data['enable'] = "false"
-        with open(f'{server_lujin}{os.sep}data{os.sep}Devices.json', 'w', encoding='utf-8') as file:
+        with open(devices_path, 'w', encoding='utf-8') as file:
             json.dump(data, file, ensure_ascii=False, indent=2)
                 
 
     def command_devices_menu_add_to_startup(server_lujin):
-        with open(f'{server_lujin}{os.sep}data{os.sep}Devices.json', 'r', encoding='utf-8') as file:
+        from WinDC import init_config_directory
+        config_dir = init_config_directory()
+        devices_path = os.path.join(config_dir, 'Devices.json')
+        with open(devices_path, 'r', encoding='utf-8') as file:
             data = json.load(file)
         data['enable'] = "true"
-        with open(f'{server_lujin}{os.sep}data{os.sep}Devices.json', 'w', encoding='utf-8') as file:
+        with open(devices_path, 'w', encoding='utf-8') as file:
             json.dump(data, file, ensure_ascii=False, indent=2)
