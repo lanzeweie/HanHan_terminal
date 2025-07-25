@@ -71,13 +71,18 @@ class Taskbar():
         command_AudioBrightnes_menu = pystray.MenuItem(Taskbar.command_AudioBrightnes_menu_name(self.app_name,self.server_lujin), lambda item: Taskbar.command_AudioBrightnes_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
         # 仅授权设备
         command_Devices_menu = pystray.MenuItem(Taskbar.command_devices_menu_name(self.app_name,self.server_lujin), lambda item: Taskbar.command_devices_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
+        # 仅执行列表命令
+        command_OrderlistAuth_menu = pystray.MenuItem(Taskbar.command_orderlist_auth_menu_name(self.app_name,self.server_lujin), lambda item: Taskbar.command_orderlist_auth_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
         # 添加检查更新菜单项
         check_update_menu = pystray.MenuItem(f"检查更新(v{VersionChecker().CURRENT_VERSION})", lambda item: threading.Thread(target=Taskbar.check_for_updates).start())
 
         menu = (
             name_menu,
             app_open_custom_menu,
+            pystray.Menu.SEPARATOR,  # 添加安全选项分隔符
             command_Devices_menu,
+            command_OrderlistAuth_menu,
+            pystray.Menu.SEPARATOR,  # 添加分隔符
             command_AudioBrightnes_menu,
             command_bootup_menu,
             open_catalogue_menu,
@@ -241,15 +246,20 @@ class Taskbar():
         command_bootup_menu = pystray.MenuItem(Taskbar.command_bootup_menu_name(app_name), lambda item: Taskbar.command_bootup_menu_startup_shifouqidong(app_name, server_lujin, app_file))
         command_AudioBrightnes_menu = pystray.MenuItem(Taskbar.command_AudioBrightnes_menu_name(app_name,server_lujin), lambda item: Taskbar.command_AudioBrightnes_menu_startup_shifouqidong(app_name, server_lujin, app_file))
         command_Devices_menu = pystray.MenuItem(Taskbar.command_devices_menu_name(app_name,server_lujin), lambda item: Taskbar.command_devices_menu_startup_shifouqidong(app_name, server_lujin, app_file))
+        command_OrderlistAuth_menu = pystray.MenuItem(Taskbar.command_orderlist_auth_menu_name(app_name,server_lujin), lambda item: Taskbar.command_orderlist_auth_startup_shifouqidong(app_name, server_lujin, app_file))
         
-        # 保持原有菜单结构
+        # 更新菜单结构，添加分隔符和新选项
         menu = (
             name_menu,
             pystray.MenuItem(f"自定义命令菜单", lambda item: Taskbar.app_open_customeditor_menu(server_lujin)),
+            pystray.Menu.SEPARATOR,  # 添加安全选项分隔符
             command_Devices_menu,
+            command_OrderlistAuth_menu,
+            pystray.Menu.SEPARATOR,  # 添加分隔符
             command_AudioBrightnes_menu,
             command_bootup_menu,
             pystray.MenuItem("打开目录", lambda item: Taskbar.open_current_directory(server_lujin)),
+            pystray.Menu.SEPARATOR,  # 添加分隔符
             pystray.MenuItem("退出", lambda item: Taskbar.command_exit_menu()),
         )
 
@@ -733,3 +743,63 @@ class Taskbar():
         data['enable'] = "true"
         with open(devices_path, 'w', encoding='utf-8') as file:
             json.dump(data, file, ensure_ascii=False, indent=2)
+
+    #--------------------------------------------仅执行列表命令-------------------------------------------------------------
+    def command_orderlist_auth_menu_name(app_name,server_lujin):
+        startup_wenbenzhi = Taskbar.command_orderlist_auth_check_startup(app_name,server_lujin)
+        if startup_wenbenzhi == "surr":
+            startup_wenbenzhi_wenben = "仅执行列表命令 【√】"
+        elif startup_wenbenzhi == "null":
+            startup_wenbenzhi_wenben = "仅执行列表命令 【X】"
+        return startup_wenbenzhi_wenben
+    
+    def command_orderlist_auth_check_startup(app_name,server_lujin):
+        from WinDC import init_config_directory
+        config_dir = init_config_directory()
+        devices_path = os.path.join(config_dir, 'Devices.json')
+        try:
+            with open(devices_path, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+                if data.get('enable_orderlist_shouquan') == "true":
+                    return "surr"
+                return "null"
+        except Exception as e:
+            print(f"读取配置时出错: {str(e)}")
+            return "null"
+
+    #更新小任务栏程序的右键菜单
+    def command_orderlist_auth_startup_shifouqidong(app_name, server_lujin, app_file):
+        if Taskbar.command_orderlist_auth_check_startup(app_name, server_lujin) == "surr":
+            Taskbar.command_orderlist_auth_remove_from_startup(app_name, server_lujin)
+            Taskbar.meun_dongtai(app_name, server_lujin, app_file)
+        elif Taskbar.command_orderlist_auth_check_startup(app_name, server_lujin) == "null":
+            Taskbar.command_orderlist_auth_add_to_startup(server_lujin)
+            Taskbar.meun_dongtai(app_name, server_lujin, app_file)
+
+    def command_orderlist_auth_remove_from_startup(app_name, server_lujin):
+        from WinDC import init_config_directory
+        config_dir = init_config_directory()
+        devices_path = os.path.join(config_dir, 'Devices.json')
+        try:
+            with open(devices_path, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+            data['enable_orderlist_shouquan'] = "false"
+            with open(devices_path, 'w', encoding='utf-8') as file:
+                json.dump(data, file, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"更新配置时出错: {str(e)}")
+            messagebox.showinfo("配置更新", f"更新配置时出错: {str(e)}")
+
+    def command_orderlist_auth_add_to_startup(server_lujin):
+        from WinDC import init_config_directory
+        config_dir = init_config_directory()
+        devices_path = os.path.join(config_dir, 'Devices.json')
+        try:
+            with open(devices_path, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+            data['enable_orderlist_shouquan'] = "true"
+            with open(devices_path, 'w', encoding='utf-8') as file:
+                json.dump(data, file, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"更新配置时出错: {str(e)}")
+            messagebox.showinfo("配置更新", f"更新配置时出错: {str(e)}")

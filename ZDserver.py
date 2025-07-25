@@ -143,6 +143,46 @@ class FlaskAPIWeb:
         cmd_back = ""
         if json_data.get("name") == "han han":
             data_command = json_data.get("command")
+            
+            # 检查是否启用了命令授权验证
+            config_dir = init_config_directory()
+            devices_path = os.path.join(config_dir, "Devices.json")
+            
+            # 检查Devices.json是否存在，以及授权设置
+            enable_auth = False
+            if os.path.exists(devices_path):
+                try:
+                    with open(devices_path, "r", encoding="utf-8") as f:
+                        devices_data = json.load(f)
+                        enable_auth = devices_data.get("enable_orderlist_shouquan") == "true"
+                except Exception as e:
+                    print(f"读取Devices.json出错: {str(e)}")
+            
+            # 如果启用了授权验证，验证命令是否在orderlist.json中
+            if enable_auth:
+                orderlist_path = os.path.join(config_dir, "orderlist.json")
+                command_authorized = False
+                try:
+                    if os.path.exists(orderlist_path):
+                        with open(orderlist_path, "r", encoding="utf-8") as f:
+                            orderlist_data = json.load(f)
+                            for item in orderlist_data:
+                                # 检查命令是否在命令列表中
+                                if item.get("command") == data_command:
+                                    command_authorized = True
+                                    break
+                    
+                    if not command_authorized:
+                        print(f"命令未授权: {data_command}")
+                        return jsonify({
+                            "title": "命令拒绝执行",
+                            "execution_time": current_time,
+                            "success": False,
+                            "cmd_back": "拒绝执行陌生命令，此命令未在命令列表中"
+                        })
+                except Exception as e:
+                    print(f"验证命令授权时出错: {str(e)}")
+            
             app_files = os.listdir(f"{server_lujin}{os.sep}app")
             
             # 处理应用程序路径
@@ -174,7 +214,6 @@ class FlaskAPIWeb:
                 if data_command == "python_volume_control_success":
                     cmd_back = f"已成功将系统音量设置为{data_value}%"
                     # 更新orderlist数据
-                    config_dir = init_config_directory()
                     orderlist_path = os.path.join(config_dir, "orderlist.json")
                     with open(orderlist_path, 'r+', encoding='utf-8') as f:
                         orderlist_data = json.load(f)
@@ -186,7 +225,6 @@ class FlaskAPIWeb:
                         f.truncate()
                 elif data_command == "python_brightness_control_success":
                     cmd_back = f"已成功将屏幕亮度设置为{data_value}%"
-                    config_dir = init_config_directory()
                     orderlist_path = os.path.join(config_dir, "orderlist.json")
                     with open(orderlist_path, 'r+', encoding='utf-8') as f:
                         orderlist_data = json.load(f)
@@ -260,7 +298,7 @@ class ServerBasics:
             while True:
                 try:
                     data, client_address = server_socket.recvfrom(1024)  # UDP接收数据
-                    current_time = datetime.datetime.now().strftime('[%Y-%m-%d %H:%M:%S]')
+                    current_time = datetime.datetime.now().strftime('[%Y-%m-%d %H:%M:%S')
                     print(f"【{current_time}】已被设备 {client_address} 发现")
                     # UDP响应设备名称
                     config_dir = init_config_directory()
