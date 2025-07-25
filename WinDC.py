@@ -22,8 +22,21 @@ try:
                                            safe_set_brightness,
                                            safe_set_volume)
     COM_PROTECTION_AVAILABLE = True
+    
+    # 添加亮度控制可用性检查
+    def _check_brightness_available():
+        try:
+            result = safe_get_brightness()
+            return result.get("success", False)
+        except Exception:
+            return False
+    
+    # 检查亮度控制是否可用
+    BRIGHTNESS_AVAILABLE = _check_brightness_available()
+    print(f"亮度控制功能: {'可用' if BRIGHTNESS_AVAILABLE else '不可用'}")
 except ImportError:
     COM_PROTECTION_AVAILABLE = False
+    BRIGHTNESS_AVAILABLE = False
     print("警告: COM保护系统不可用，音量和亮度控制功能将受限")
 
 from flask import jsonify, request

@@ -111,53 +111,14 @@ class Taskbar():
             await asyncio.sleep(3600)  # 每小时检查一次，保持循环运行
 
     @staticmethod
+    # 版本更新，调用 update
     def check_for_updates():
         def run_check():
             from update import VersionChecker
             checker = VersionChecker()
-            if not checker.check_for_updates():
-                Taskbar.show_update_links()
-            else:
-                window = tk.Tk()
-                window.title("版本检查")
-                window_width = 240
-                window_height = 40
-                center_window(window, window_width, window_height)
-                label = tk.Label(window, text="当前已是最新版本")
-                label.pack(pady=10)
-                window.mainloop()
+            checker.check_for_updates()
         
         thread = threading.Thread(target=run_check)
-        thread.start()
-
-    def show_update_links():
-        def run_update_window():
-            def open_github():
-                webbrowser.open("https://github.com/lanzeweie/HanHan_terminal/releases")
-
-            def open_gitee():
-                webbrowser.open("https://gitee.com/buxiangqumingzi/han-han_terminal/releases")
-
-            def open_lanzou():
-                webbrowser.open("https://wwpp.lanzouv.com/b0foy1bkb")
-
-            window = tk.Tk()
-            window.title("版本检查")
-            window_width = 400
-            window_height = 200
-            center_window(window, window_width, window_height)
-            label = tk.Label(window, text="发现新版本，请选择下载链接：")
-            label.pack(pady=10)
-            button_style = {"font": ("Helvetica", 12), "bg": "#007AFF", "fg": "white", "relief": "flat", "bd": 0}
-            button_github = tk.Button(window, text="GitHub", command=open_github, **button_style)
-            button_github.pack(pady=5)
-            button_gitee = tk.Button(window, text="Gitee", command=open_gitee, **button_style)
-            button_gitee.pack(pady=5)
-            button_lanzou = tk.Button(window, text="蓝奏云", command=open_lanzou, **button_style)
-            button_lanzou.pack(pady=5)
-            window.mainloop()
-        
-        thread = threading.Thread(target=run_update_window)
         thread.start()
         
     @staticmethod
@@ -808,6 +769,16 @@ class Taskbar():
     def command_orderlist_auth_add_to_startup(server_lujin):
         from WinDC import init_config_directory
         config_dir = init_config_directory()
+        devices_path = os.path.join(config_dir, 'Devices.json')
+        try:
+            with open(devices_path, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+            data['enable_orderlist_shouquan'] = "true"
+            with open(devices_path, 'w', encoding='utf-8') as file:
+                json.dump(data, file, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"更新配置时出错: {str(e)}")
+            messagebox.showinfo("配置更新", f"更新配置时出错: {str(e)}")
         devices_path = os.path.join(config_dir, 'Devices.json')
         try:
             with open(devices_path, 'r', encoding='utf-8') as file:
