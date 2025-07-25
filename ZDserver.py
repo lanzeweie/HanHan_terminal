@@ -167,13 +167,13 @@ class FlaskAPIWeb:
                         with open(orderlist_path, "r", encoding="utf-8") as f:
                             orderlist_data = json.load(f)
                             for item in orderlist_data:
-                                # 检查命令是否在命令列表中
-                                if item.get("command") == data_command:
+                                # 检查命令是否在命令列表中（使用datacommand字段）
+                                if item.get("datacommand") == data_command:
                                     command_authorized = True
                                     break
                     
                     if not command_authorized:
-                        print(f"命令未授权: {data_command}")
+                        print(f"命令在列表中不存在: {data_command}")
                         return jsonify({
                             "title": "命令拒绝执行",
                             "execution_time": current_time,
@@ -199,11 +199,19 @@ class FlaskAPIWeb:
                     if cmd == "setsysvolume {value}":
                         volume = int(val)
                         success, message = PPowerShell.control_system_volume(volume)
-                        return "python_volume_control_success" if success else "python_volume_control_failed"
+                        if not success:
+                            print(f"音量控制失败: {message}")
+                            with open(log_file_name, "a", encoding="utf-8") as f:
+                                f.write(f"【{current_time}】\n[控制台]: 音量控制失败: {message}\n")
+                        return "python_volume_control_success" if success else f"python_volume_control_failed:{message}"
                     elif cmd == "setbrightness {value}":
                         brightness = int(val)
                         success, message = PPowerShell.control_system_brightness(brightness)
-                        return "python_brightness_control_success" if success else "python_brightness_control_failed"
+                        if not success:
+                            print(f"亮度控制失败: {message}")
+                            with open(log_file_name, "a", encoding="utf-8") as f:
+                                f.write(f"【{current_time}】\n[控制台]: 亮度控制失败: {message}\n")
+                        return "python_brightness_control_success" if success else f"python_brightness_control_failed:{message}"
                     else:
                         return cmd.replace('{value}', str(val))
                 
@@ -223,6 +231,10 @@ class FlaskAPIWeb:
                         f.seek(0)
                         json.dump(orderlist_data, f, indent=2, ensure_ascii=False)
                         f.truncate()
+                elif data_command.startswith("python_volume_control_failed"):
+                    error_detail = data_command.split(":", 1)[1] if ":" in data_command else "未知错误"
+                    cmd_back = f"设置系统音量为{data_value}%失败: {error_detail}"
+                    print(f"详细错误: {error_detail}")
                 elif data_command == "python_brightness_control_success":
                     cmd_back = f"已成功将屏幕亮度设置为{data_value}%"
                     orderlist_path = os.path.join(config_dir, "orderlist.json")
@@ -234,6 +246,10 @@ class FlaskAPIWeb:
                         f.seek(0)
                         json.dump(orderlist_data, f, indent=2, ensure_ascii=False)
                         f.truncate()
+                elif data_command.startswith("python_brightness_control_failed"):
+                    error_detail = data_command.split(":", 1)[1] if ":" in data_command else "未知错误"
+                    cmd_back = f"设置屏幕亮度为{data_value}%失败: {error_detail}"
+                    print(f"详细错误: {error_detail}")
                 else:
                     output = subprocess.check_output(data_command, shell=True, stderr=subprocess.STDOUT, universal_newlines=True)
                     cmd_back = output

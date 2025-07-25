@@ -244,10 +244,29 @@ class ProcessIsolatedCOMWorker:
                     import comtypes
                     comtypes.CoInitialize()
                     COM_INITIALIZED = True
-                except Exception:
+                except Exception as e:
                     COM_INITIALIZED = False
-                    result_queue.put({"success": False, "error": "COM初始化失败"})
+                    error_msg = f"COM初始化失败: {str(e)}"
+                    print(error_msg)
+                    result_queue.put({"success": False, "error": error_msg})
                     return
+                
+                # 检查音量控制库是否可用
+                if operation in ["get_volume", "set_volume"]:
+                    try:
+                        from pycaw.pycaw import (AudioUtilities,
+                                                 IAudioEndpointVolume)
+                        PYCAW_AVAILABLE = True
+                    except ImportError as e:
+                        error_msg = f"pycaw库导入失败: {str(e)}"
+                        print(error_msg)
+                        result_queue.put({"success": False, "error": error_msg})
+                        return
+                    except Exception as e:
+                        error_msg = f"pycaw库初始化异常: {str(e)}"
+                        print(error_msg)
+                        result_queue.put({"success": False, "error": error_msg})
+                        return
                 
                 try:
                     # 执行操作
@@ -274,6 +293,7 @@ class ProcessIsolatedCOMWorker:
                         "error": f"COM操作异常: {str(e)}",
                         "traceback": traceback.format_exc()
                     }
+                    print(f"COM操作异常: {str(e)}\n{traceback.format_exc()}")
                     result_queue.put(error_info)
                 finally:
                     # 释放COM资源
@@ -284,7 +304,9 @@ class ProcessIsolatedCOMWorker:
                             pass
             except Exception as e:
                 # 捕获线程中的所有异常
-                result_queue.put({"success": False, "error": f"线程异常: {str(e)}"})
+                error_msg = f"线程异常: {str(e)}"
+                print(error_msg)
+                result_queue.put({"success": False, "error": error_msg})
         
         # 创建并启动线程
         com_thread = threading.Thread(target=run_com_operation)
@@ -306,6 +328,8 @@ class ProcessIsolatedCOMWorker:
     def _get_volume(self):
         """获取系统音量实现"""
         try:
+            from ctypes import POINTER, cast  # 确保在方法内也导入
+
             from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
             
             devices = AudioUtilities.GetSpeakers()
@@ -319,6 +343,8 @@ class ProcessIsolatedCOMWorker:
     def _set_volume(self, volume_percent):
         """设置系统音量实现"""
         try:
+            from ctypes import POINTER, cast  # 确保在方法内也导入
+
             from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
             
             devices = AudioUtilities.GetSpeakers()

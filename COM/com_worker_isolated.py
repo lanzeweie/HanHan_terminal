@@ -1,10 +1,9 @@
-
 """
 COM操作工作进程 - 隔离COM操作避免主进程崩溃
 """
 import json
 import sys
-from ctypes import POINTER, cast
+from ctypes import POINTER, cast  # 将导入移到全局范围
 
 # COM初始化
 try:
@@ -24,6 +23,7 @@ except ImportError:
 # 亮度控制 - 使用旧版本的简单检测方式
 try:
     import screen_brightness_control as sbc
+
     # 简单检测：只要能导入库就认为亮度控制可能可用
     BRIGHTNESS_AVAILABLE = True
     
@@ -45,6 +45,9 @@ def get_volume():
         return {"success": False, "error": "pycaw不可用或COM未初始化"}
     
     try:
+        # 确保这里也能访问cast，虽然已在顶部导入
+        from ctypes import POINTER, cast
+        
         devices = AudioUtilities.GetSpeakers()
         interface = devices.Activate(IAudioEndpointVolume._iid_, 0, None)
         volume = cast(interface, POINTER(IAudioEndpointVolume))
@@ -60,6 +63,9 @@ def set_volume(volume_percent):
         return {"success": False, "error": "pycaw不可用或COM未初始化"}
     
     try:
+        # 确保这里也能访问cast，虽然已在顶部导入
+        from ctypes import POINTER, cast
+        
         devices = AudioUtilities.GetSpeakers()
         interface = devices.Activate(IAudioEndpointVolume._iid_, 0, None)
         volume = cast(interface, POINTER(IAudioEndpointVolume))
