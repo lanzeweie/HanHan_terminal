@@ -591,7 +591,7 @@ class App(tk.Frame):
         
         tip_text = ttk.Label(
             tip_frame,
-            text="自定义命令功能是调用Windows的运行组件，一般情况建议使用cmd来执行命令，即在你的命令前面添加 “cmd.exe /c 你的命令”\nURL命令功能：调用url连接，获得返回的结果，不支持添加参数\n对于需要参数可以尝试直接编辑用户文档\\orderlist.json根据音量示范添加{value}值",
+            text="自定义命令功能是调用Windows的运行组件，一般情况建议使用cmd来执行命令，即在你的命令前面添加 “cmd.exe /c 你的命令”\nURL命令功能：调用url连接，获得返回的结果，不支持添加参数\n对于需要参数可以尝试直接编辑“Windows用户文档\\orderlist.json”根据音量示范添加{value}值",
             wraplength=600,
         )
         tip_text.pack(side="top", pady=5)
@@ -709,19 +709,20 @@ class App(tk.Frame):
                 cmd_type = "系统命令"
                 content = "系统内置命令"
 
-            # 创建主项
-            parent_tag = f"item{i}"
-            parent_id = self.menu_list.insert("", "end", parent_tag, text=title, values=(cmd_type,))
+            # 创建扁平化列表项，标题和命令内容作为独立的行
+            title_tag = f"title{i}"
+            content_tag = f"content{i}"
             
-            # 创建子项显示命令内容
-            content_id = self.menu_list.insert(parent_tag, "end", text=f"{content}")
+            # 添加标题行
+            self.menu_list.insert("", "end", title_tag, text=title, values=(cmd_type,), tags=("title", f"index{i}"))
             
-            # 默认展开所有项
-            self.menu_list.item(parent_id, open=True)
+            # 添加命令内容行，缩进显示
+            self.menu_list.insert("", "end", content_tag, text="  " + content, values=("", ), tags=("content", f"index{i}"))
             
-            # 为不同行设置交替颜色
+            # 为不同行设置交替背景色
             if i % 2 == 0:
-                self.menu_list.tag_configure(parent_tag, background="#f0f0f0")
+                self.menu_list.tag_configure(title_tag, background="#f0f0f0")
+                self.menu_list.tag_configure(content_tag, background="#f0f0f0")
 
     def on_select(self, event):
         """列表选择事件处理"""
@@ -731,15 +732,17 @@ class App(tk.Frame):
         
         selected_item = self.menu_list.selection()[0]
         
-        # 检查是否选中了子项，如果是则获取父项
-        if self.menu_list.parent(selected_item):
-            selected_item = self.menu_list.parent(selected_item)
+        # 从标签中提取索引
+        tags = self.menu_list.item(selected_item, "tags")
         
-        # 通过item标签获取索引
-        item_tag = selected_item
-        if item_tag.startswith('item'):
-            index = int(item_tag[4:])
+        if not tags:
+            self.reset_buttons()
+            return
             
+        # 获取index标签值
+        index_tag = next((tag for tag in tags if tag.startswith("index")), None)
+        if index_tag:
+            index = int(index_tag[5:])  # 提取index后面的数字
             item = self.data[index]
             
             # 更新按钮状态
@@ -754,30 +757,6 @@ class App(tk.Frame):
         else:
             self.reset_buttons()
 
-    def on_double_click(self, event):
-        """双击事件处理 - 快速编辑命令"""
-        selection = self.menu_list.selection()
-        if not selection:
-            return
-            
-        selected_item = selection[0]
-        
-        # 检查是否选中了子项，如果是则获取父项
-        if self.menu_list.parent(selected_item):
-            selected_item = self.menu_list.parent(selected_item)
-            
-        # 获取索引
-        if selected_item.startswith('item'):
-            index = int(selected_item[4:])
-            item = self.data[index]
-            
-            # 检查命令是否可编辑
-            can_edit = "datacommand" in item or ("apiUrlCommand" in item and item["apiUrlCommand"] == "yes")
-            
-            # 如果命令可编辑，则打开编辑界面
-            if can_edit:
-                self.modify_command()
-
     def update_move_buttons(self, index=None):
         """更新移动按钮状态"""
         if index is None:
@@ -787,60 +766,164 @@ class App(tk.Frame):
         
         self.move_up_button.config(state="normal" if index > 0 else "disabled")
         self.move_down_button.config(state="normal" if index < len(self.data) - 1 else "disabled")
-
-    def reset_buttons(self):
-        """重置按钮状态"""
-        self.modify_command_button.config(state="disabled")
-        self.delete_command_button.config(state="disabled")
-        self.move_up_button.config(state="disabled")
-        self.move_down_button.config(state="disabled")
-        
-    # 其他方法需要相应修改，使用item标签获取索引
-    def modify_command(self):
-        """修改命令"""
+    
+    def on_double_click(self, event):
+        """双击事件处理 - 快速编辑命令"""
         selection = self.menu_list.selection()
         if not selection:
             return
             
         selected_item = selection[0]
         
-        # 检查是否选中了子项，如果是则获取父项
-        if self.menu_list.parent(selected_item):
-            selected_item = self.menu_list.parent(selected_item)
+        # 获取项目的标签
+        tags = self.menu_list.item(selected_item, "tags")
+        
+        if not tags:
+            return
             
-        # 获取索引
-        if selected_item.startswith('item'):
-            index = int(selected_item[4:])
+        # 获取index标签值
+        index_tag = next((tag for tag in tags if tag.startswith("index")), None)
+        if index_tag:
+            index = int(index_tag[5:])  # 提取index后面的数字
             item = self.data[index]
             
-            if "datacommand" in item:
-                dialog_title = "修改命令"
-                dialog_text = "请输入新命令"
-                initial_value = item["datacommand"]
+            # 检查是标题行还是内容行
+            if "title" in tags:
+                # 编辑标题
+                dialog_title = "修改标题"
+                dialog_text = "请输入新标题"
+                initial_value = item["title"]
                 
                 dialog = CustomDialog(self.master, dialog_title, dialog_text, initial_value)
-                new_command = dialog.result
+                new_title = dialog.result
                 
-                if new_command is not None:
-                    item["datacommand"] = new_command
+                if new_title is not None:
+                    item["title"] = new_title
                     self.save_data()
-                    
-            elif "apiUrlCommand" in item and item["apiUrlCommand"] == "yes":
-                dialog_title = "修改API URL"
-                dialog_text = "请输入新的API URL"
-                initial_value = item["apiUrl"]
+                    self.init_menu_list()
+                    # 选中编辑后的项
+                    self.menu_list.selection_set(f"title{index}")
+                    self.menu_list.focus(f"title{index}")
+                    self.menu_list.see(f"title{index}")
+            
+            elif "content" in tags:
+                # 编辑命令内容
+                can_edit = "datacommand" in item or ("apiUrlCommand" in item and item["apiUrlCommand"] == "yes")
                 
-                dialog = CustomDialog(self.master, dialog_title, dialog_text, initial_value)
-                new_url = dialog.result
-                
-                if new_url is not None:
-                    item["apiUrl"] = new_url
-                    self.save_data()
-        
-        self.init_menu_list()
-        # 选中修改后的项
-        self.menu_list.selection_set(f"item{index}")
+                if can_edit:
+                    if "datacommand" in item:
+                        dialog_title = "修改命令"
+                        dialog_text = "请输入新命令"
+                        initial_value = item["datacommand"]
+                        
+                        dialog = CustomDialog(self.master, dialog_title, dialog_text, initial_value)
+                        new_command = dialog.result
+                        
+                        if new_command is not None:
+                            item["datacommand"] = new_command
+                            self.save_data()
+                            self.init_menu_list()
+                            # 选中编辑后的项
+                            self.menu_list.selection_set(f"content{index}")
+                            self.menu_list.focus(f"content{index}")
+                            self.menu_list.see(f"content{index}")
+                        
+                    elif "apiUrlCommand" in item and item["apiUrlCommand"] == "yes":
+                        dialog_title = "修改API URL"
+                        dialog_text = "请输入新的API URL"
+                        initial_value = item["apiUrl"]
+                        
+                        dialog = CustomDialog(self.master, dialog_title, dialog_text, initial_value)
+                        new_url = dialog.result
+                        
+                        if new_url is not None:
+                            item["apiUrl"] = new_url
+                            self.save_data()
+                            self.init_menu_list()
+                            # 选中编辑后的项
+                            self.menu_list.selection_set(f"content{index}")
+                            self.menu_list.focus(f"content{index}")
+                            self.menu_list.see(f"content{index}")
 
+    def modify_command(self):
+        """修改命令 - 根据选择的是标题还是内容执行对应操作"""
+        selection = self.menu_list.selection()
+        if not selection:
+            return
+            
+        selected_item = selection[0]
+        
+        # 获取项目的标签
+        tags = self.menu_list.item(selected_item, "tags")
+        
+        if not tags:
+            return
+            
+        # 获取index标签值
+        index_tag = next((tag for tag in tags if tag.startswith("index")), None)
+        if index_tag:
+            index = int(index_tag[5:])  # 提取index后面的数字
+            item = self.data[index]
+            
+            # 检查是标题行还是内容行
+            if "title" in tags:
+                # 编辑标题
+                dialog_title = "修改标题"
+                dialog_text = "请输入新标题"
+                initial_value = item["title"]
+                
+                dialog = CustomDialog(self.master, dialog_title, dialog_text, initial_value)
+                new_title = dialog.result
+                
+                if new_title is not None:
+                    item["title"] = new_title
+                    self.save_data()
+                    self.init_menu_list()
+                    # 选中编辑后的项
+                    self.menu_list.selection_set(f"title{index}")
+                    self.menu_list.focus(f"title{index}")
+                    self.menu_list.see(f"title{index}")
+            
+            elif "content" in tags:
+                # 编辑命令内容，与双击事件处理相同
+                can_edit = "datacommand" in item or ("apiUrlCommand" in item and item["apiUrlCommand"] == "yes")
+                
+                if can_edit:
+                    if "datacommand" in item:
+                        dialog_title = "修改命令"
+                        dialog_text = "请输入新命令"
+                        initial_value = item["datacommand"]
+                        
+                        dialog = CustomDialog(self.master, dialog_title, dialog_text, initial_value)
+                        new_command = dialog.result
+                        
+                        if new_command is not None:
+                            item["datacommand"] = new_command
+                            self.save_data()
+                            self.init_menu_list()
+                            # 选中编辑后的项
+                            self.menu_list.selection_set(f"content{index}")
+                            self.menu_list.focus(f"content{index}")
+                            self.menu_list.see(f"content{index}")
+                        
+                    elif "apiUrlCommand" in item and item["apiUrlCommand"] == "yes":
+                        dialog_title = "修改API URL"
+                        dialog_text = "请输入新的API URL"
+                        initial_value = item["apiUrl"]
+                        
+                        dialog = CustomDialog(self.master, dialog_title, dialog_text, initial_value)
+                        new_url = dialog.result
+                        
+                        if new_url is not None:
+                            item["apiUrl"] = new_url
+                            self.save_data()
+                            self.init_menu_list()
+                            # 选中编辑后的项
+                            self.menu_list.selection_set(f"content{index}")
+                            self.menu_list.focus(f"content{index}")
+                            self.menu_list.see(f"content{index}")
+
+    # 需要修改删除命令和移动命令的实现，使用新的标签系统
     def delete_command(self):
         """删除命令"""
         selection = self.menu_list.selection()
@@ -849,13 +932,16 @@ class App(tk.Frame):
             
         selected_item = selection[0]
         
-        # 检查是否选中了子项，如果是则获取父项
-        if self.menu_list.parent(selected_item):
-            selected_item = self.menu_list.parent(selected_item)
+        # 获取项目的标签
+        tags = self.menu_list.item(selected_item, "tags")
+        
+        if not tags:
+            return
             
-        # 获取索引
-        if selected_item.startswith('item'):
-            index = int(selected_item[4:])
+        # 获取index标签值
+        index_tag = next((tag for tag in tags if tag.startswith("index")), None)
+        if index_tag:
+            index = int(index_tag[5:])  # 提取index后面的数字
             item = self.data[index]
             
             confirm = messagebox.askyesno("确认删除", f"确定要删除命令 {item['title']} 吗？")
@@ -873,23 +959,31 @@ class App(tk.Frame):
         
         selected_item = selection[0]
         
-        # 检查是否选中了子项，如果是则获取父项
-        if self.menu_list.parent(selected_item):
-            selected_item = self.menu_list.parent(selected_item)
+        # 获取项目的标签
+        tags = self.menu_list.item(selected_item, "tags")
+        
+        if not tags:
+            return
             
-        # 获取索引
-        if selected_item.startswith('item'):
-            index = int(selected_item[4:])
+        # 获取index标签值
+        index_tag = next((tag for tag in tags if tag.startswith("index")), None)
+        if index_tag:
+            index = int(index_tag[5:])  # 提取index后面的数字
             
             if index > 0:
                 self.data[index], self.data[index - 1] = self.data[index - 1], self.data[index]
                 self.save_data()
                 self.init_menu_list()
                 
-                # 选中移动后的项
-                self.menu_list.selection_set(f"item{index-1}")
-                self.menu_list.focus(f"item{index-1}")
-                self.menu_list.see(f"item{index-1}")
+                # 根据当前选择是标题还是内容，选中移动后的相应项
+                if "title" in tags:
+                    self.menu_list.selection_set(f"title{index-1}")
+                    self.menu_list.focus(f"title{index-1}")
+                    self.menu_list.see(f"title{index-1}")
+                else:
+                    self.menu_list.selection_set(f"content{index-1}")
+                    self.menu_list.focus(f"content{index-1}")
+                    self.menu_list.see(f"content{index-1}")
 
     def move_down(self):
         """下移命令"""
@@ -899,23 +993,31 @@ class App(tk.Frame):
         
         selected_item = selection[0]
         
-        # 检查是否选中了子项，如果是则获取父项
-        if self.menu_list.parent(selected_item):
-            selected_item = self.menu_list.parent(selected_item)
+        # 获取项目的标签
+        tags = self.menu_list.item(selected_item, "tags")
+        
+        if not tags:
+            return
             
-        # 获取索引
-        if selected_item.startswith('item'):
-            index = int(selected_item[4:])
+        # 获取index标签值
+        index_tag = next((tag for tag in tags if tag.startswith("index")), None)
+        if index_tag:
+            index = int(index_tag[5:])  # 提取index后面的数字
             
             if index < len(self.data) - 1:
                 self.data[index], self.data[index + 1] = self.data[index + 1], self.data[index]
                 self.save_data()
                 self.init_menu_list()
                 
-                # 选中移动后的项
-                self.menu_list.selection_set(f"item{index+1}")
-                self.menu_list.focus(f"item{index+1}")
-                self.menu_list.see(f"item{index+1}")
+                # 根据当前选择是标题还是内容，选中移动后的相应项
+                if "title" in tags:
+                    self.menu_list.selection_set(f"title{index+1}")
+                    self.menu_list.focus(f"title{index+1}")
+                    self.menu_list.see(f"title{index+1}")
+                else:
+                    self.menu_list.selection_set(f"content{index+1}")
+                    self.menu_list.focus(f"content{index+1}")
+                    self.menu_list.see(f"content{index+1}")
 
     def open_device_manager(self):
         """打开设备管理器"""
