@@ -25,24 +25,8 @@ try:
                                            safe_set_volume)
     COM_PROTECTION_AVAILABLE = True
     
-    # 添加与旧版本兼容的亮度检测方法
-    def _check_brightness_available():
-        try:
-            # 检查库是否已安装
-            import screen_brightness_control as sbc
-
-            # 像旧版本一样，只要库可用就认为支持
-            print("亮度检测: screen_brightness_control库可用，判定为支持亮度控制")
-            return True
-        except ImportError:
-            print("亮度检测: screen_brightness_control库不可用，判定为不支持亮度控制")
-            return False
-        except Exception as e:
-            print(f"亮度检测异常: {str(e)}")
-            return False
-    
-    # 检查亮度控制是否可用（使用旧版本兼容的方法）
-    BRIGHTNESS_AVAILABLE = _check_brightness_available()
+    # 使用系统底层方法检查亮度控制是否可用
+    BRIGHTNESS_AVAILABLE = is_brightness_control_available()
     print(f"亮度控制功能: {'可用' if BRIGHTNESS_AVAILABLE else '不可用'}")
 except ImportError:
     COM_PROTECTION_AVAILABLE = False
