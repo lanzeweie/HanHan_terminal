@@ -690,39 +690,55 @@ class App(tk.Frame):
 
     def init_menu_list(self):
         """初始化菜单列表"""
+        # 清除现有项
         for i in self.menu_list.get_children():
             self.menu_list.delete(i)
         
+        # 为每个命令添加项目
         for i, item in enumerate(self.data):
             title = item["title"]
             
+            # 提取图标和类型文字
+            icon = ""
             if "datacommand" in item:
-                cmd_type = "⚙️ 自定义命令"
+                icon = "⚙️ "
+                cmd_type = "自定义命令"
                 content = item["datacommand"]
             elif "apiUrlCommand" in item:
-                cmd_type = "🔗 API链接"
+                icon = "🔗 "
+                cmd_type = "API链接"
                 content = item["apiUrl"]
             elif "url" in item and item["url"] == "yes":
-                cmd_type = "🌐 URL"
+                icon = "🌐 "
+                cmd_type = "URL"
                 content = item["apiUrl"]
             else:
+                icon = ""
                 cmd_type = "系统命令"
                 content = "系统内置命令"
-
-            # 创建扁平化列表项，标题和命令内容作为独立的行
+                
+            # 创建命令组标签
+            group_tag = f"group{i}"
             title_tag = f"title{i}"
             content_tag = f"content{i}"
             
-            # 添加标题行
-            self.menu_list.insert("", "end", title_tag, text=title, values=(cmd_type,), tags=("title", f"index{i}"))
+            # 添加命令标题行，图标放在标题前面
+            self.menu_list.insert("", "end", title_tag, text=icon + title, values=(cmd_type,), 
+                                 tags=("title", f"index{i}", group_tag))
             
-            # 添加命令内容行，缩进显示
-            self.menu_list.insert("", "end", content_tag, text="  " + content, values=("", ), tags=("content", f"index{i}"))
+            # 添加命令内容行，稍微缩进
+            self.menu_list.insert("", "end", content_tag, text="  " + content, values=("", ), 
+                                 tags=("content", f"index{i}", group_tag))
             
-            # 为不同行设置交替背景色
-            if i % 2 == 0:
-                self.menu_list.tag_configure(title_tag, background="#f0f0f0")
-                self.menu_list.tag_configure(content_tag, background="#f0f0f0")
+            # 设置组的背景色，使用更明显的交替色以增强分隔效果
+            bg_color = "#F0F5FF" if i % 2 == 0 else "#FFFFFF"
+            self.menu_list.tag_configure(group_tag, background=bg_color)
+            
+            # 为标题行设置粗体
+            self.menu_list.tag_configure(title_tag, font=("微软雅黑", 10, "bold"))
+            
+            # 为内容行设置字体
+            self.menu_list.tag_configure(content_tag, font=("微软雅黑", 9))
 
     def on_select(self, event):
         """列表选择事件处理"""
