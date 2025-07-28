@@ -1,6 +1,7 @@
 {
   "name": "仅允许授权设备",
   "enable": "true",
+  "enable_orderlist_shouquan":"true",
   "authorizedDevices": [],
   "blacklistedDevices": []
 }

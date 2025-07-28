@@ -6,6 +6,12 @@ import sys
 import threading
 import time
 
+# 兼容 Nuitka 打包环境下的 CREATE_NO_WINDOW
+if hasattr(subprocess, "CREATE_NO_WINDOW"):
+    CREATE_NO_WINDOW = subprocess.CREATE_NO_WINDOW
+else:
+    CREATE_NO_WINDOW = 0x08000000  # Windows API 定义
+
 # 配置
 VOLUME_EXE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app", "volume_control.exe")
 MAX_WORKERS = 2  # 并发进程数限制
@@ -25,7 +31,7 @@ def _worker():
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                creationflags=subprocess.CREATE_NO_WINDOW  # 静默运行
+                creationflags=CREATE_NO_WINDOW  # 静默运行
             )
             stdout, stderr = proc.communicate(timeout=10)
             try:

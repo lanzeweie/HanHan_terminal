@@ -202,3 +202,128 @@ int wmain(int argc, wchar_t* argv[]) {
 
     return 0;
 }
+
+/*
+// vo_fixed.cpp
+// cl vo.cpp /O1 /GR- /GS- /EHs-c- /DNDEBUG /DWIN32_LEAN_AND_MEAN /link /OUT:volume_control_tiny.exe /SUBSYSTEM:CONSOLE /OPT:REF /OPT:ICF /RELEASE ole32.lib user32.lib shell32.lib advapi32.lib
+#define UNICODE
+#define _UNICODE
+
+#include <windows.h>
+#include <shellapi.h> // <--- 之前添加的头文件，保留
+#include <mmdeviceapi.h>
+#include <endpointvolume.h>
+#include <wchar.h>
+
+// --- Helper Functions (无变化) ---
+void itow_s(int value, wchar_t* buffer, size_t size) {
+    _itow_s(value, buffer, size, 10);
+}
+
+void PrintJson(LPCWSTR key, LPCWSTR value) {
+    wchar_t buffer[256];
+    wsprintfW(buffer, L"{\"success\": true, \"%s\": %s}\n", key, value);
+    WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), buffer, lstrlenW(buffer), NULL, NULL);
+}
+
+void PrintJsonError(LPCWSTR operation, LPCWSTR errorMsg) {
+    wchar_t buffer[512];
+    wsprintfW(buffer, L"{\"success\": false, \"operation\": \"%s\", \"error\": \"%s\"}\n", operation, errorMsg);
+    WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), buffer, lstrlenW(buffer), NULL, NULL);
+}
+
+void ShowVolumeOSD(IAudioEndpointVolume* pEndpointVolume) {
+    if (!pEndpointVolume) return;
+    float currentVolume = 0.0f;
+    if (SUCCEEDED(pEndpointVolume->GetMasterVolumeLevelScalar(&currentVolume))) {
+        INPUT input[2] = {};
+        input[0].type = INPUT_KEYBOARD;
+        input[1].type = INPUT_KEYBOARD;
+        input[1].ki.dwFlags = KEYEVENTF_KEYUP;
+        input[0].ki.wVk = (currentVolume < 1.0f) ? VK_VOLUME_UP : VK_VOLUME_DOWN;
+        input[1].ki.wVk = input[0].ki.wVk;
+        SendInput(2, input, sizeof(INPUT));
+        Sleep(50);
+        pEndpointVolume->SetMasterVolumeLevelScalar(currentVolume, NULL);
+    }
+}
+
+// =========================================================================
+//  ↓↓↓ 主要修改区域 ↓↓↓
+// =========================================================================
+
+// 将 wWinMain 替换为 wmain，这是控制台程序的正确入口点
+int wmain(int argc, wchar_t* argv[]) {
+    // 不再需要 CommandLineToArgvW，因为 argc 和 argv 是直接传入的
+
+    if (argc < 2) {
+        PrintJsonError(L"unknown", L"Invalid arguments. Usage: <get|set|adjust> [value]");
+        return 1;
+    }
+
+    LPCWSTR operation = argv[1];
+    HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    if (FAILED(hr)) {
+        PrintJsonError(operation, L"COM initialization failed.");
+        return 1;
+    }
+
+    IAudioEndpointVolume* pEndpointVolume = NULL;
+    int returnCode = 0;
+
+    do {
+        IMMDeviceEnumerator* pEnumerator = NULL;
+        hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), (void**)&pEnumerator);
+        if (FAILED(hr)) { PrintJsonError(operation, L"Failed to create enumerator."); returnCode = 1; break; }
+
+        IMMDevice* pDevice = NULL;
+        hr = pEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &pDevice);
+        if (pEnumerator) pEnumerator->Release();
+        if (FAILED(hr)) { PrintJsonError(operation, L"Failed to get endpoint."); returnCode = 1; break; }
+
+        hr = pDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, NULL, (void**)&pEndpointVolume);
+        if (pDevice) pDevice->Release();
+        if (FAILED(hr)) { PrintJsonError(operation, L"Failed to activate volume interface."); returnCode = 1; break; }
+
+        float currentVolume;
+        if (FAILED(pEndpointVolume->GetMasterVolumeLevelScalar(&currentVolume))) {
+            PrintJsonError(operation, L"Failed to get volume."); returnCode = 1; break;
+        }
+
+        if (_wcsicmp(operation, L"get") == 0) {
+            wchar_t volStr[8];
+            itow_s(static_cast<int>(currentVolume * 100 + 0.5), volStr, 8);
+            PrintJson(L"volume", volStr);
+        }
+        else if ((_wcsicmp(operation, L"set") == 0 || _wcsicmp(operation, L"adjust") == 0)) {
+            if (argc < 3) { PrintJsonError(operation, L"Missing value."); returnCode = 1; break; }
+
+            int targetPercent = _wtoi(argv[2]);
+            if (_wcsicmp(operation, L"adjust") == 0) {
+                targetPercent += static_cast<int>(currentVolume * 100 + 0.5);
+            }
+
+            targetPercent = max(0, min(100, targetPercent));
+
+            if (FAILED(pEndpointVolume->SetMasterVolumeLevelScalar(targetPercent / 100.0f, NULL))) {
+                PrintJsonError(operation, L"Failed to set volume."); returnCode = 1; break;
+            }
+
+            wchar_t volStr[8];
+            itow_s(targetPercent, volStr, 8);
+            PrintJson(L"volume", volStr);
+            ShowVolumeOSD(pEndpointVolume);
+        }
+        else {
+            PrintJsonError(operation, L"Unknown operation.");
+            returnCode = 1;
+        }
+
+    } while (false);
+
+    if (pEndpointVolume) pEndpointVolume->Release();
+    CoUninitialize();
+    // 不再需要 LocalFree(argv)
+    return returnCode;
+}
+*/

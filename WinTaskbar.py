@@ -5,7 +5,6 @@ import os
 import subprocess
 import threading
 import tkinter as tk
-import webbrowser  # 添加此行
 import winreg
 from tkinter import messagebox  # 确保导入了Toplevel
 

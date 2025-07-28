@@ -11,6 +11,9 @@ import time
 import winreg
 import zipfile
 
+# 新增：导入Win_Check的检查函数
+from Win_Check import check_required_files
+
 # 设置screen_brightness_control的日志级别为ERROR，屏蔽WARNING
 logging.getLogger('screen_brightness_control.windows').setLevel(logging.ERROR)
 from tkinter import messagebox
@@ -338,6 +341,9 @@ class ServerBasics:
 
 if __name__ == '__main__':
     print("------------------------------\n涵的涵涵的控制终端核心\n------------------------------")
+
+    # 新增：启动时检查依赖文件
+    check_required_files(server_lujin)
 
     # 函数补丁
     original_volume_control = PPowerShell.control_system_volume
