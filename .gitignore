@@ -20,3 +20,6 @@ ZDserver.onefile-build
 ZDserver.dist
 ZDserver.build
 .gitignore
+app/volume_control.exe
+nuitka-crash-report.xml
+*.pyc

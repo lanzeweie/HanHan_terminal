@@ -21,7 +21,12 @@ def _worker():
         task_id, args = _task_queue.get()
         try:
             cmd = [VOLUME_EXE] + args
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=subprocess.CREATE_NO_WINDOW  # 静默运行
+            )
             stdout, stderr = proc.communicate(timeout=10)
             try:
                 result = json.loads(stdout.decode("utf-8"))
