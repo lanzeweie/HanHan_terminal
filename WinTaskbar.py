@@ -533,27 +533,15 @@ class Taskbar():
             # 检查屏幕是否支持亮度控制
             try:
                 # 避免循环导入，在函数内部导入
-                from WinDC import (BRIGHTNESS_AVAILABLE, PPowerShell,
-                                   init_config_directory)
+                from WinDC import PPowerShell, init_config_directory
+                from WinDc.screen_brightness import (check_brightness_support,
+                                                     get_brightness)
 
-                # 首先检查必要的库是否已安装
-                if not BRIGHTNESS_AVAILABLE:
-                    messagebox.showinfo("亮度控制", "无法添加亮度控制：缺少所需的库支持。\n请确保已安装 screen_brightness_control 和 wmi 库。")
+                # 使用新方法检测亮度支持
+                check_result = check_brightness_support()
+                if not check_result.get("brightness_available", False):
+                    messagebox.showinfo("亮度控制", "当前屏幕不支持亮度调节功能。")
                     return
-                # 检查亮度控制支持，但不实际改变亮度
-                try:
-                    import screen_brightness_control as sbc
-
-                    # 只获取当前亮度而不设置值
-                    current_brightness = sbc.get_brightness()
-                    if isinstance(current_brightness, list) and not current_brightness:
-                        messagebox.showinfo("亮度控制", "当前屏幕不支持亮度调节功能。")
-                        return
-                except Exception as e:
-                    error_msg = str(e).lower()
-                    if "unsupported" in error_msg or "not supported" in error_msg or "error" in error_msg:
-                        messagebox.showinfo("亮度控制", f"当前屏幕不支持亮度调节功能。\n错误信息：{str(e)}")
-                        return
             except Exception as e:
                 # 处理可能的导入或其他错误
                 messagebox.showinfo("亮度控制", f"无法检查亮度控制支持: {str(e)}")
@@ -573,14 +561,21 @@ class Taskbar():
                     if item['title'] == '亮度控制':
                         # 已存在，不需要添加
                         return
-                
+
+                # 获取当前亮度真实数值
+                try:
+                    brightness_result = get_brightness()
+                    brightness_value = brightness_result.get("brightness", 50) if brightness_result.get("success") else 50
+                except Exception:
+                    brightness_value = 50
+
                 # 不存在，添加新项目
                 new_item = {
                     "title": "亮度控制",
                     "apiUrl": "http://*hanhanip*:5202/command",
                     "guding": "n",
                     "datacommand": "setbrightness {value}",
-                    "value": 50
+                    "value": brightness_value
                 }
                 
                 found_audio_control = False
@@ -781,6 +776,16 @@ class Taskbar():
     def command_orderlist_auth_add_to_startup(server_lujin):
         from WinDC import init_config_directory
         config_dir = init_config_directory()
+        devices_path = os.path.join(config_dir, 'Devices.json')
+        try:
+            with open(devices_path, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+            data['enable_orderlist_shouquan'] = "true"
+            with open(devices_path, 'w', encoding='utf-8') as file:
+                json.dump(data, file, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"更新配置时出错: {str(e)}")
+            messagebox.showinfo("配置更新", f"更新配置时出错: {str(e)}")
         devices_path = os.path.join(config_dir, 'Devices.json')
         try:
             with open(devices_path, 'r', encoding='utf-8') as file:

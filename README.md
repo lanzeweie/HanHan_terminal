@@ -64,10 +64,8 @@
 ├── log/                  --日志    
 │   └── last.log          --当前日志，会自动打包上一次的日志     
 ├── app/                  --一些可用上的辅助程序         
+│   ├── volume_control.cpp          --支持Win7-Win11亮度调节 
 │   └── Custom_command_editor.py          --快捷命令菜单编辑器      
-├── COM/                  --COM线锁多线程         
-│   ├── com_protection_system.py      --全面的COM崩溃防护系统  
-│   └── com_worker_isolated.py    --COM操作工作进程    
 ├── requirements.txt      --所需库      
 ├── REMDAD.md     
 ├── WinDC.py              --底层基层命令    

@@ -13,28 +13,11 @@ import uuid  # 添加uuid导入用于获取MAC地址
 from tkinter import messagebox
 
 import psutil  # 添加psutil导入用于获取网络接口信息
+from flask import jsonify, request  # <-- 移动到这里，确保全局可用
 
-# 使用新的COM保护系统
-try:
-    from COM.com_protection_system import (get_protection_system,
-                                           is_brightness_control_available,
-                                           safe_check_brightness_support,
-                                           safe_get_brightness,
-                                           safe_get_volume,
-                                           safe_set_brightness,
-                                           safe_set_volume)
-    COM_PROTECTION_AVAILABLE = True
-    
-    # 使用系统底层方法检查亮度控制是否可用
-    BRIGHTNESS_AVAILABLE = is_brightness_control_available()
-    print(f"亮度控制功能: {'可用' if BRIGHTNESS_AVAILABLE else '不可用'}")
-except ImportError:
-    COM_PROTECTION_AVAILABLE = False
-    BRIGHTNESS_AVAILABLE = False
-    print("警告: COM保护系统不可用，音量和亮度控制功能将受限")
-
-from flask import jsonify, request
-
+from WinDc.screen_brightness import (check_brightness_support, get_brightness,
+                                     set_brightness)
+from WinDc.volume_c import adjust_volume, get_volume, set_volume
 from WinTaskbar import Taskbar
 
 # 全局文件锁，确保线程安全的文件操作
@@ -219,83 +202,50 @@ class PPowerShell():
         """兼容性方法，返回当前IP地址"""
         return PPowerShell.get_ipv4_now()
 
+    @staticmethod
     def file_json_Audio():
         """
-        读取并更新音量亮度配置，避免直接使用COM
-        改为使用COM保护系统读取音量和亮度值
+        读取并更新音量亮度配置，使用volume_c和screen_brightness
         """
-        if not COM_PROTECTION_AVAILABLE:
-            print("COM保护系统不可用，跳过音量亮度更新")
-            return
-            
         need_update = False
         try:
-            # 使用COM保护系统获取当前值
-            current_volume = None
-            current_brightness = None
-            
-            # 获取音量（使用缓存）
-            volume_result = safe_get_volume(use_cache=True)
-            if volume_result.get("success"):
-                current_volume = volume_result.get("volume")
-            
-            # 获取亮度（使用缓存）
-            brightness_result = safe_get_brightness(use_cache=True)
-            if brightness_result.get("success"):
-                current_brightness = brightness_result.get("brightness")
-            
+            # 获取音量
+            volume_result = get_volume()
+            current_volume = volume_result.get("volume") if volume_result.get("success") else None
+
+            # 获取亮度
+            brightness_result = get_brightness()
+            current_brightness = brightness_result.get("brightness") if brightness_result.get("success") else None
+
             # 读取orderlist数据
             config_dir = init_config_directory()
             orderlist_path = os.path.join(config_dir, config_orderlist)
             data = safe_json_read(orderlist_path, config_orderlist, [])
-            
+
             # 更新数据项
             for item in data:
                 if item.get('title') == '音量控制' and current_volume is not None:
                     if item.get('value') != current_volume:
                         item['value'] = current_volume
                         need_update = True
-                
                 elif item.get('title') == '亮度控制' and current_brightness is not None:
                     if item.get('value') != current_brightness:
                         item['value'] = current_brightness
                         need_update = True
-            
+
             # 只有在需要更新时才写入文件
             if need_update:
                 if safe_json_write(orderlist_path, config_orderlist, data):
                     print("配置文件已更新音量和亮度值")
         except Exception as e:
             print(f"更新音量和亮度值时出错: {str(e)}")
-    
+
     @staticmethod
     def update_audio_brightness_cache(volume=None, brightness=None):
         """
-        更新音量亮度缓存 - 现在由COM保护系统自动处理
-        保留此方法以维持兼容性
+        更新音量亮度缓存 - 兼容保留，无实际作用
         """
-        try:
-            config_dir = init_config_directory()
-            cache_path = os.path.join(config_dir, 'audio_brightness_cache.json')
-            
-            # 使用线程安全的文件操作
-            cache_data = safe_json_read(cache_path, 'audio_brightness_cache.json', {})
-            
-            # 只更新提供的值
-            if volume is not None:
-                cache_data["volume"] = volume
-            if brightness is not None:
-                cache_data["brightness"] = brightness
-            
-            # 添加更新时间戳
-            cache_data["last_update"] = time.time()
-            
-            # 线程安全地保存缓存文件
-            if not safe_json_write(cache_path, 'audio_brightness_cache.json', cache_data):
-                print("更新音量亮度缓存失败")
-                
-        except Exception as e:
-            print(f"更新音量亮度缓存出错: {str(e)}")
+        pass
 
     def file_json_geshihua(ipv4,port):
         #格式化data json数据，设置为当机地址
@@ -638,45 +588,29 @@ class PPowerShell():
     @staticmethod
     def control_system_volume(volume_percent):
         """
-        使用COM保护系统设置系统音量
-        :param volume_percent: 音量百分比，范围0-100
-        :return: 成功返回True和当前音量，失败返回False和错误信息
+        设置系统音量
         """
-        if not COM_PROTECTION_AVAILABLE:
-            return False, "COM保护系统不可用"
-        
         try:
-            result = safe_set_volume(volume_percent)
-            
+            result = set_volume(volume_percent)
             if result.get("success"):
                 current_percent = result.get("volume", volume_percent)
-                # 保持兼容性，更新旧缓存
-                PPowerShell.update_audio_brightness_cache(volume=current_percent)
                 return True, f"已设置音量至: {current_percent}%"
             else:
                 error_msg = result.get("error", "未知错误")
                 return False, f"设置音量失败: {error_msg}"
         except Exception as e:
             return False, f"设置音量异常: {str(e)}"
-        
+
     # 修改亮度控制功能，使用进程隔离
     @staticmethod
     def control_system_brightness(brightness_percent):
         """
-        使用COM保护系统设置屏幕亮度
-        :param brightness_percent: 亮度百分比，范围0-100
-        :return: 成功返回True和当前亮度，失败返回False和错误信息
+        设置屏幕亮度
         """
-        if not COM_PROTECTION_AVAILABLE:
-            return False, "COM保护系统不可用"
-        
         try:
-            result = safe_set_brightness(brightness_percent)
-            
+            result = set_brightness(brightness_percent)
             if result.get("success"):
                 current_percent = result.get("brightness", brightness_percent)
-                # 保持兼容性，更新旧缓存
-                PPowerShell.update_audio_brightness_cache(brightness=current_percent)
                 return True, f"已设置亮度至: {current_percent}%"
             else:
                 error_msg = result.get("error", "未知错误")
@@ -687,72 +621,35 @@ class PPowerShell():
     @staticmethod
     def update_volume_brightness_safe():
         """
-        使用COM保护系统安全更新音量和亮度信息到orderlist
+        安全更新音量和亮度信息到orderlist
         """
-        if not COM_PROTECTION_AVAILABLE:
-            print("COM保护系统不可用，跳过音量亮度更新")
-            return False
-            
-        # 添加高频访问限制
+        # 高频访问限制可选实现
         current_time = time.time()
-        if current_time - PPowerShell.last_volume_brightness_update < PPowerShell.MIN_UPDATE_INTERVAL:
-            print(f"更新音量和亮度过于频繁，已跳过本次更新 (间隔: {current_time - PPowerShell.last_volume_brightness_update:.2f}秒)")
-            return False
-            
-        # 更新时间戳
+        if hasattr(PPowerShell, "last_volume_brightness_update"):
+            if current_time - PPowerShell.last_volume_brightness_update < 5:
+                print(f"更新音量和亮度过于频繁，已跳过本次更新")
+                return False
         PPowerShell.last_volume_brightness_update = current_time
-        
+
         try:
-            # 使用COM保护系统获取音量和亮度
-            current_volume = None
-            current_brightness = None
-            
-            # 获取音量（优先使用缓存，减少COM调用）
-            volume_result = safe_get_volume(use_cache=True)
-            if volume_result.get("success"):
-                current_volume = volume_result.get("volume")
-                if volume_result.get("from_cache"):
-                    print("使用缓存的音量值")
-                        
-            # 获取亮度（优先使用缓存，减少COM调用）
-            brightness_result = safe_get_brightness(use_cache=True)
-            if brightness_result.get("success"):
-                current_brightness = brightness_result.get("brightness")
-                if brightness_result.get("from_cache"):
-                    print("使用缓存的亮度值")
-            
-            # 更新COM保护系统缓存到旧缓存（兼容性）
-            if current_volume is not None or current_brightness is not None:
-                PPowerShell.update_audio_brightness_cache(
-                    volume=current_volume, 
-                    brightness=current_brightness
-                )
-            
-            # 更新orderlist数据
+            current_volume = get_volume().get("volume")
+            current_brightness = get_brightness().get("brightness")
             need_update = False
-            try:
-                config_dir = init_config_directory()
-                orderlist_path = os.path.join(config_dir, config_orderlist)
-                data = safe_json_read(orderlist_path, config_orderlist, [])
-                
-                for item in data:
-                    if item.get('title') == '音量控制' and current_volume is not None:
-                        if item.get('value') != current_volume:
-                            item['value'] = current_volume
-                            need_update = True
-                    
-                    elif item.get('title') == '亮度控制' and current_brightness is not None:
-                        if item.get('value') != current_brightness:
-                            item['value'] = current_brightness
-                            need_update = True
-                
-                if need_update:
-                    if safe_json_write(orderlist_path, config_orderlist, data):
-                        print("配置文件已更新音量和亮度值")
-                    
-            except Exception as e:
-                print(f"更新音量亮度配置文件时出错: {str(e)}")
-                
+            config_dir = init_config_directory()
+            orderlist_path = os.path.join(config_dir, config_orderlist)
+            data = safe_json_read(orderlist_path, config_orderlist, [])
+            for item in data:
+                if item.get('title') == '音量控制' and current_volume is not None:
+                    if item.get('value') != current_volume:
+                        item['value'] = current_volume
+                        need_update = True
+                elif item.get('title') == '亮度控制' and current_brightness is not None:
+                    if item.get('value') != current_brightness:
+                        item['value'] = current_brightness
+                        need_update = True
+            if need_update:
+                if safe_json_write(orderlist_path, config_orderlist, data):
+                    print("配置文件已更新音量和亮度值")
         except Exception as e:
             print(f"更新音量亮度总体出错: {str(e)}")
     
@@ -780,37 +677,24 @@ class PPowerShell():
             return "00:00:00:00:00:00"  # 失败时返回默认值
 
 if __name__ == "__main__":
-    # 初始化崩溃监控系统
-    monitor = init_crash_monitor()
-    monitor.log_info("=== 涵涵终端控制核心启动 ===")
-    monitor.log_info("崩溃监控系统已启动")
-    
-    # 初始化COM保护系统
-    if COM_PROTECTION_AVAILABLE:
-        protection_system = get_protection_system()
-        monitor.log_info("COM保护系统已启动")
-        
-        # 显示系统统计
-        stats = protection_system.get_system_stats()
-        monitor.log_info(f"COM保护系统统计: {stats}")
-    else:
-        monitor.log_warning("COM保护系统不可用，音量和亮度功能受限")
-    
     try:
-        #print(PPowerShell.file_json_Audio())
         print(f"当前活动网络接口MAC地址: {PPowerShell.get_mac_address()}")
         print(f"当前IP地址: {PPowerShell.get_ipv4_now()}")
-        monitor.log_info(f"系统初始化完成 - MAC: {PPowerShell.get_mac_address()}, IP: {PPowerShell.get_ipv4_now()}")
-        
-        # 测试COM保护系统功能
-        if COM_PROTECTION_AVAILABLE:
-            try:
-                volume_info = safe_get_volume()
-                brightness_info = safe_get_brightness()
-                monitor.log_info(f"音量状态: {volume_info.get('success', False)}, 亮度状态: {brightness_info.get('success', False)}")
-            except Exception as e:
-                monitor.log_warning(f"COM功能测试异常: {str(e)}")
-                
+        # 直接测试音量和亮度功能
+        print(f"当前音量: {get_volume()}")
+        print(f"当前亮度: {get_brightness()}")
+
+        # 使用专门的检查函数
+        check_result = check_brightness_support()
+        if check_result.get("brightness_available", False):
+            # 支持亮度控制
+            # 输出详细的检测信息
+            if "detection_methods" in check_result:
+                methods = check_result["detection_methods"]
+                print(f"亮度控制检测详情: Dxva2={methods.get('dxva2_available', False)}, "
+                      f"SBC库={methods.get('sbc_available', False)}, "
+                      f"能获取亮度={methods.get('can_get_brightness', False)}, "
+                      f"有显示器={methods.get('has_monitors', False)}")
     except Exception as e:
-        monitor.log_critical(f"主程序启动失败: {str(e)}")
+        print(f"主程序启动失败: {str(e)}")
         raise
