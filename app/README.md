@@ -10,3 +10,6 @@
 
 python写肯定是不可以的，一个小小的功能，体积必须精简，所以考虑C++来写，功能也只有调节音量、获得音量
 
+使用cl/g++打包  大小 g++ 150kb  cl 100kb，功能仅音量控制 传出json
+>g++ -o volume_control.exe volume_control.cpp -lole32 -luser32 -luuid -lwinmm -mconsole -DUNICODE -D_UNICODE
+>cl vo.cpp /O1 /GR- /GS- /EHs-c- /DNDEBUG /DWIN32_LEAN_AND_MEAN /link /OUT:volume_control_tiny.exe /SUBSYSTEM:CONSOLE /OPT:REF /OPT:ICF /RELEASE ole32.lib user32.lib shell32.lib advapi32.lib

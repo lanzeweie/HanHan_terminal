@@ -206,6 +206,36 @@ class VersionChecker:
             self.show_current_version_info()
             return True
 
+    def get_new_version_info(self):
+        """
+        检测当前版本是否有新版本。
+        返回 (True, 新版本号) 或 (False, 当前版本号)
+        """
+        github_url = self.GITHUB_RELEASES_URL.format(
+            owner=self.github_owner, repo=self.github_repo
+        )
+        latest_release = self.fetch_latest_release(github_url)
+
+        if not latest_release:
+            gitee_url = self.GITEE_RELEASES_URL.format(
+                owner=self.gitee_owner,
+                repo=self.gitee_repo,
+                access_token=self.access_token,
+            )
+            latest_release = self.fetch_latest_release(gitee_url)
+
+        if latest_release:
+            release_version = latest_release["tag_name"].lstrip("v")
+            if not self.compare_versions(self.current_version, release_version):
+                # 有新版本
+                return True, release_version
+            else:
+                # 没有新版本
+                return False, self.current_version
+        else:
+            # 网络错误，无法检测新版本
+            return False, self.current_version
+
 
 if __name__ == "__main__":
     checker = VersionChecker()

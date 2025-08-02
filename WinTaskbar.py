@@ -47,7 +47,21 @@ class Taskbar():
             self.ipv4_ip = ipv4_ip
             self.port = port
             self.serve_windows_mix_icon = None  # 实例变量
+            self.update_info = None  # 新增：保存版本检测结果
+            self.update_error = None  # 新增：保存异常信息
             self._initialized = True
+
+            # 新增：初始化时异步检测新版本
+            def fetch_update_info():
+                try:
+                    checker = VersionChecker()
+                    result = checker.get_new_version_info()
+                    self.update_info = result  # (True, 新版本号) 或 (False, 当前版本号)
+                    self.update_error = None
+                except Exception as e:
+                    self.update_info = None
+                    self.update_error = str(e)  # 保存异常原因
+            threading.Thread(target=fetch_update_info, daemon=True).start()
 
     #初始化
     def chushihua(self):
@@ -55,6 +69,13 @@ class Taskbar():
         app_name_taskbar = self.app_name
         server_lujin_taskbar = self.server_lujin
         app_file_taskbar = self.app_file
+        current_version = VersionChecker().CURRENT_VERSION #版本号内置
+        # 等待异步线程返回结果，最多2秒
+        import time
+        wait_time = 0
+        while self.update_info is None and wait_time < 2:
+            time.sleep(0.1)
+            wait_time += 0.1
 
         #固定菜单选项
         app_open_custom_menu = pystray.MenuItem(f"自定义命令菜单编辑器", lambda item: Taskbar.app_open_customeditor_menu(server_lujin_taskbar))
@@ -72,8 +93,21 @@ class Taskbar():
         command_Devices_menu = pystray.MenuItem(Taskbar.command_devices_menu_name(self.app_name,self.server_lujin), lambda item: Taskbar.command_devices_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
         # 仅执行列表命令
         command_OrderlistAuth_menu = pystray.MenuItem(Taskbar.command_orderlist_auth_menu_name(self.app_name,self.server_lujin), lambda item: Taskbar.command_orderlist_auth_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
-        # 添加检查更新菜单项
-        check_update_menu = pystray.MenuItem(f"检查更新(v{VersionChecker().CURRENT_VERSION})", lambda item: threading.Thread(target=Taskbar.check_for_updates).start())
+        # 动态设置检查更新菜单项文字
+        if self.update_info is not None:
+            if self.update_info[0]:  # 有新版本
+                check_update_text = f"v{current_version},发现新版本(v{self.update_info[1]})"
+            else:
+                check_update_text = f"检查更新(v{current_version})"
+        else:
+            check_update_text = f"检查更新(v{current_version})"
+            if self.update_error:
+                print(f"检查更新失败，原因：{self.update_error}")
+
+        check_update_menu = pystray.MenuItem(
+            check_update_text,
+            lambda item: threading.Thread(target=Taskbar.check_for_updates).start()
+        )
 
         menu = (
             name_menu,
