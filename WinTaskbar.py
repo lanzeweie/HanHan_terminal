@@ -95,6 +95,8 @@ class Taskbar():
         command_OrderlistAuth_menu = pystray.MenuItem(Taskbar.command_orderlist_auth_menu_name(self.app_name,self.server_lujin), lambda item: Taskbar.command_orderlist_auth_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
         # 移动端下载（必要）
         mobile_download_menu = pystray.MenuItem("移动端下载", lambda item: threading.Thread(target=Taskbar.show_mobile_download_menu, args=(self.server_lujin,), daemon=True).start())
+        # 使用教程（打开 LookMe.png）
+        intro_menu = pystray.MenuItem("使用教程", lambda item: threading.Thread(target=Taskbar.open_intro_menu, args=(self.server_lujin,), daemon=True).start())
         # 动态设置检查更新菜单项文字
         if self.update_info is not None:
             if self.update_info[0]:  # 有新版本
@@ -124,6 +126,7 @@ class Taskbar():
             pystray.Menu.SEPARATOR,  # 添加分隔符
             check_update_menu,  # 添加此行
             mobile_download_menu,  # 新增：移动端下载菜单项（位于检查更新下方、退出上方）
+            intro_menu,  # 新增：使用教程（位于移动端下载下方，退出上方）
             command_exit_menu,
         )
         #声明 global serve_windows_mix_icon 是全局变量
@@ -259,6 +262,7 @@ class Taskbar():
             pystray.Menu.SEPARATOR,  # 添加分隔符
             pystray.MenuItem("检查更新", lambda item: threading.Thread(target=Taskbar.check_for_updates).start()),
             pystray.MenuItem("移动端下载", lambda item: threading.Thread(target=Taskbar.show_mobile_download_menu, args=(server_lujin,), daemon=True).start()),
+            pystray.MenuItem("使用教程", lambda item: threading.Thread(target=Taskbar.open_intro_menu, args=(server_lujin,), daemon=True).start()),
             pystray.MenuItem("退出", lambda item: Taskbar.command_exit_menu()),
         )
 
@@ -960,3 +964,17 @@ class Taskbar():
 
         thread = threading.Thread(target=create_window, daemon=True)
         thread.start()
+
+    # 打开使用教程图片 LookMe.png
+    def open_intro_menu(server_lujin):
+        try:
+            intro_path = f"{server_lujin}{os.sep}LookMe.png"
+            if not os.path.exists(intro_path):
+                messagebox.showinfo("使用教程", "未找到使用教程图片：LookMe.png")
+                return
+            os.startfile(intro_path)
+        except Exception as e:
+            try:
+                messagebox.showinfo("使用教程", f"打开使用教程失败：{str(e)}")
+            except:
+                print(f"打开使用教程失败：{str(e)}")
