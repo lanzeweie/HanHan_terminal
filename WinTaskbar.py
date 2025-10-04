@@ -93,6 +93,8 @@ class Taskbar():
         command_Devices_menu = pystray.MenuItem(Taskbar.command_devices_menu_name(self.app_name,self.server_lujin), lambda item: Taskbar.command_devices_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
         # 仅执行列表命令
         command_OrderlistAuth_menu = pystray.MenuItem(Taskbar.command_orderlist_auth_menu_name(self.app_name,self.server_lujin), lambda item: Taskbar.command_orderlist_auth_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
+        # 移动端下载（必要）
+        mobile_download_menu = pystray.MenuItem("移动端下载", lambda item: threading.Thread(target=Taskbar.show_mobile_download_menu, args=(self.server_lujin,), daemon=True).start())
         # 动态设置检查更新菜单项文字
         if self.update_info is not None:
             if self.update_info[0]:  # 有新版本
@@ -121,6 +123,7 @@ class Taskbar():
             open_catalogue_menu,
             pystray.Menu.SEPARATOR,  # 添加分隔符
             check_update_menu,  # 添加此行
+            mobile_download_menu,  # 新增：移动端下载菜单项（位于检查更新下方、退出上方）
             command_exit_menu,
         )
         #声明 global serve_windows_mix_icon 是全局变量
@@ -254,6 +257,8 @@ class Taskbar():
             command_bootup_menu,
             pystray.MenuItem("打开目录", lambda item: Taskbar.open_current_directory(server_lujin)),
             pystray.Menu.SEPARATOR,  # 添加分隔符
+            pystray.MenuItem("检查更新", lambda item: threading.Thread(target=Taskbar.check_for_updates).start()),
+            pystray.MenuItem("移动端下载", lambda item: threading.Thread(target=Taskbar.show_mobile_download_menu, args=(server_lujin,), daemon=True).start()),
             pystray.MenuItem("退出", lambda item: Taskbar.command_exit_menu()),
         )
 
@@ -839,3 +844,119 @@ class Taskbar():
         except Exception as e:
             print(f"更新配置时出错: {str(e)}")
             messagebox.showinfo("配置更新", f"更新配置时出错: {str(e)}")
+
+
+    def show_mobile_download_menu(server_lujin):
+        """
+        弹出一个居中的窗口，显示移动端下载二维码、下载链接和密码，提供复制按钮。
+        优先从 server_lujin/png/qrcode_pc.woozooo.com.png 加载图片。
+        """
+        def create_window():
+            try:
+                from PIL import Image, ImageTk
+            except Exception:
+                Image = None
+                ImageTk = None
+
+            root = tk.Tk()
+            root.withdraw()
+            win = tk.Toplevel(root)
+            win.title("移动端下载")
+            win.attributes("-topmost", True)
+            # 设置图标（可选）
+            try:
+                icon = tk.PhotoImage(file=os.path.join(server_lujin, "data", "zhou.png"))
+                win.iconphoto(False, icon)
+            except Exception:
+                pass
+
+            window_width, window_height = 380, 520
+            center_window(win, window_width, window_height)
+
+            # 容器和样式
+            main_frame = tk.Frame(win, padx=16, pady=12)
+            main_frame.pack(fill=tk.BOTH, expand=True)
+
+            # 尝试加载二维码图片（优先使用 PIL 进行缩放）
+            img_loaded = False
+            img_path_candidates = [
+                os.path.join(server_lujin, "png", "qrcode_pc.woozooo.com.png"),
+            ]
+            for img_path in img_path_candidates:
+                if os.path.exists(img_path):
+                    try:
+                        if Image and ImageTk:
+                            pil_img = Image.open(img_path)
+                            pil_img = pil_img.resize((240, 240), Image.LANCZOS)
+                            tk_img = ImageTk.PhotoImage(pil_img)
+                        else:
+                            tk_img = tk.PhotoImage(file=img_path)
+                        img_label = tk.Label(main_frame, image=tk_img)
+                        img_label.image = tk_img
+                        img_label.pack(pady=(6, 8))
+                        img_loaded = True
+                        break
+                    except Exception as e:
+                        print(e)
+                        continue
+
+            if not img_loaded:
+                tk.Label(main_frame, text="[二维码图片无法加载]", font=("Helvetica", 12), fg="#cc0000").pack(pady=(10, 6))
+
+            # 说明文字
+            tk.Label(main_frame, text="手机扫描下载\n或者手动输入 url", font=("Helvetica", 13), justify="center").pack(pady=(6, 8))
+            url = "https://wwpp.lanzoum.com/b0foy1bkb"
+            pwd = "1xw0"
+            url_entry = tk.Entry(main_frame, font=("Helvetica", 11), bd=1, relief=tk.SUNKEN, justify="center")
+            url_entry.insert(0, url)
+            url_entry.pack(fill=tk.X, padx=20, pady=(4, 6))
+            url_entry.configure(state="readonly")
+
+            pwd_frame = tk.Frame(main_frame)
+            pwd_frame.pack(pady=(6, 12))
+            tk.Label(pwd_frame, text="密码：", font=("Helvetica", 12)).pack(side=tk.LEFT)
+            pwd_label = tk.Label(pwd_frame, text=pwd, font=("Helvetica", 12, "bold"))
+            pwd_label.pack(side=tk.LEFT, padx=(4, 0))
+
+            button_frame = tk.Frame(main_frame)
+            button_frame.pack(pady=(8, 6))
+
+            def copy_url():
+                try:
+                    root.clipboard_clear()
+                    root.clipboard_append(url)
+                except Exception as e:
+                    messagebox.showinfo("复制失败", f"复制链接失败：{str(e)}")
+
+            def copy_pwd():
+                try:
+                    root.clipboard_clear()
+                    root.clipboard_append(pwd)
+                except Exception as e:
+                    messagebox.showinfo("复制失败", f"复制密码失败：{str(e)}")
+
+            btn_style = {"font": ("Helvetica", 11), "bg": "#007AFF", "fg": "white", "relief": tk.FLAT, "bd": 0, "padx": 12, "pady": 6}
+            copy_url_btn = tk.Button(button_frame, text="复制链接", command=copy_url, **btn_style)
+            copy_url_btn.pack(side=tk.LEFT, padx=8)
+            copy_pwd_btn = tk.Button(button_frame, text="复制密码", command=copy_pwd, **btn_style)
+            copy_pwd_btn.pack(side=tk.LEFT, padx=8)
+
+            # 关闭按钮
+            close_btn = tk.Button(main_frame, text="关闭", command=lambda: (win.destroy(), root.destroy()),
+                                  bg="#E0E0E0", fg="#333333", font=("Helvetica", 11), relief=tk.FLAT, bd=0, padx=12, pady=6)
+            close_btn.pack(pady=(10, 4))
+
+            def on_close():
+                try:
+                    win.destroy()
+                finally:
+                    try:
+                        root.destroy()
+                    except:
+                        pass
+
+            win.protocol("WM_DELETE_WINDOW", on_close)
+            win.mainloop()
+
+        thread = threading.Thread(target=create_window, daemon=True)
+        thread.start()

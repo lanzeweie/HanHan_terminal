@@ -1,0 +1,7 @@
+[project]
+name = "hanhan-terminal"
+version = "2.2.3"
+description = "涵涵的控制面板-终端"
+readme = "README.md"
+requires-python = ">=3.13.7"
+dependencies = []
