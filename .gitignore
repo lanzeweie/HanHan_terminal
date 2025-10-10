@@ -24,3 +24,4 @@ app/volume_control.exe
 nuitka-crash-report.xml
 *.pyc
 .venv
+ce.py
