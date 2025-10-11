@@ -33,19 +33,33 @@ else:
 
 print(f"当前工作目录: {server_lujin}")
 
+# 检查是否为Windows商店应用路径
+is_windows_store_app = "WindowsApps" in server_lujin
+if is_windows_store_app:
+    print("检测到Windows商店应用路径，禁用日志写入功能")
+else:
+    print("检测到正常应用路径，启用日志写入功能")
+
 # 日志压缩处理
 log_file = "last.log"
 app_file = os.path.basename(sys.argv[0])
 zip_file_name = time.strftime("%Y_%m_%d_%H_%M_%S") + ".zip"
 log_dir = f"{server_lujin}{os.sep}log"
-os.makedirs(log_dir, exist_ok=True)
-if os.path.exists(f"{log_dir}{os.sep}{log_file}"):
-    with zipfile.ZipFile(f"{log_dir}{os.sep}{zip_file_name}", 'w') as zf:
-        zf.write(f"{log_dir}{os.sep}{log_file}", arcname=log_file)
+
+# 根据路径判断是否启用日志功能
+if not is_windows_store_app:
+    os.makedirs(log_dir, exist_ok=True)
+    if os.path.exists(f"{log_dir}{os.sep}{log_file}"):
+        with zipfile.ZipFile(f"{log_dir}{os.sep}{zip_file_name}", 'w') as zf:
+            zf.write(f"{log_dir}{os.sep}{log_file}", arcname=log_file)
+    else:
+        with open(f"{log_dir}{os.sep}{log_file}", "w") as f:
+            f.write("")
+    log_file_name = f"{log_dir}{os.sep}{log_file}"
 else:
-    with open(f"{log_dir}{os.sep}{log_file}", "w") as f:
-        f.write("")
-log_file_name = f"{log_dir}{os.sep}{log_file}"
+    # Windows商店应用不使用日志文件
+    log_file_name = None
+    print("Windows商店应用模式：跳过日志文件创建")
 
 app = Flask(__name__)
 CORS(app)
@@ -71,8 +85,9 @@ class FlaskAPIWeb:
         current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         nrong = f"【{current_time}】\n[控制台]: 设备 {client_ip} 进行访问hello\n"
         print(nrong)
-        with open(log_file_name, "a", encoding="utf-8") as f:
-            f.write(nrong)
+        if log_file_name:
+            with open(log_file_name, "a", encoding="utf-8") as f:
+                f.write(nrong)
         return jsonify({
             "title": "欢迎连接至终端",
             "execution_time": current_time,
@@ -85,8 +100,9 @@ class FlaskAPIWeb:
         current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         log_msg = f"【{current_time}】[控制台]: 设备 {client_ip} 访问name接口\n"
         print(log_msg)
-        with open(log_file_name, "a", encoding="utf-8") as f:
-            f.write(log_msg)
+        if log_file_name:
+            with open(log_file_name, "a", encoding="utf-8") as f:
+                f.write(log_msg)
         config_dir = init_config_directory()
         id_path = os.path.join(config_dir, "id.json")
         with open(id_path, "r", encoding="utf-8") as f:
@@ -136,8 +152,9 @@ class FlaskAPIWeb:
         print(f"【{current_time}】\n[控制台]: 设备 {client_ip} 发起命令 【自定义命令】")
         print("JSON 数据:", json_data)
 
-        with open(log_file_name, "a", encoding="utf-8") as f:
-            f.write(f"【{current_time}】\n[控制台]: 设备 {client_ip} 发起命令 【自定义命令】\nJSON 数据: {json_data}\n")
+        if log_file_name:
+            with open(log_file_name, "a", encoding="utf-8") as f:
+                f.write(f"【{current_time}】\n[控制台]: 设备 {client_ip} 发起命令 【自定义命令】\nJSON 数据: {json_data}\n")
 
         verify_result = PPowerShell.verify_device(json_data, device_lock)
         if verify_result is not True:
@@ -204,16 +221,18 @@ class FlaskAPIWeb:
                         success, message = PPowerShell.control_system_volume(volume)
                         if not success:
                             print(f"音量控制失败: {message}")
-                            with open(log_file_name, "a", encoding="utf-8") as f:
-                                f.write(f"【{current_time}】\n[控制台]: 音量控制失败: {message}\n")
+                            if log_file_name:
+                                with open(log_file_name, "a", encoding="utf-8") as f:
+                                    f.write(f"【{current_time}】\n[控制台]: 音量控制失败: {message}\n")
                         return "python_volume_control_success" if success else f"python_volume_control_failed:{message}"
                     elif cmd == "setbrightness {value}":
                         brightness = int(val)
                         success, message = PPowerShell.control_system_brightness(brightness)
                         if not success:
                             print(f"亮度控制失败: {message}")
-                            with open(log_file_name, "a", encoding="utf-8") as f:
-                                f.write(f"【{current_time}】\n[控制台]: 亮度控制失败: {message}\n")
+                            if log_file_name:
+                                with open(log_file_name, "a", encoding="utf-8") as f:
+                                    f.write(f"【{current_time}】\n[控制台]: 亮度控制失败: {message}\n")
                         return "python_brightness_control_success" if success else f"python_brightness_control_failed:{message}"
                     else:
                         return cmd.replace('{value}', str(val))

@@ -25,3 +25,5 @@ nuitka-crash-report.xml
 *.pyc
 .venv
 ce.py
+.
+/WeiruanPNG

@@ -102,7 +102,7 @@ class VersionChecker:
     GITHUB_REPO = "HanHan_terminal"
     GITEE_OWNER = "buxiangqumingzi"
     GITEE_REPO = "han-han_terminal"
-    CURRENT_VERSION = "2.2.2"
+    CURRENT_VERSION = "2.2.3"
     TIMEOUT = 0.5
 
     def __init__(self):
