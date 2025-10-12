@@ -78,6 +78,12 @@ for path in possible_icon_paths:
     if os.path.exists(path):
         icon_path = path
         break
+else:
+    # 所有本地路径均不存在，使用内置资源路径
+    if getattr(sys, 'frozen', False):
+        icon_path = os.path.join(sys._MEIPASS, "1.ico")
+    else:
+        icon_path = "./1.ico"
 
 def load_devices_config():
     """加载设备配置文件"""
@@ -1148,20 +1154,27 @@ class App(tk.Frame):
     def open_community_website(self):
         """打开自定义命令社区网站"""
         url_file_path = f"{quanju_lujin}{os.sep}url.json"
-        
+        # 当前脚本目录备用路径
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        fallback_path = os.path.join(script_dir, "url.json")
+
         try:
             if os.path.exists(url_file_path):
-                with open(url_file_path, "r", encoding="utf-8") as f:
-                    url_data = json.load(f)
-                    if "url" in url_data:
-                        webbrowser.open(url_data["url"])
-                    else:
-                        messagebox.showerror("错误", "URL文件中未找到url元素")
+                path_to_use = url_file_path
+            elif os.path.exists(fallback_path):
+                path_to_use = fallback_path
             else:
-                messagebox.showerror("错误", f"未找到URL文件：{url_file_path}")
+                messagebox.showerror("错误", f"未找到URL文件：{url_file_path} 或 {fallback_path}")
+                return
+
+            with open(path_to_use, "r", encoding="utf-8") as f:
+                url_data = json.load(f)
+                if "url" in url_data:
+                    webbrowser.open(url_data["url"])
+                else:
+                    messagebox.showerror("错误", "URL文件中未找到url元素")
         except Exception as e:
             messagebox.showerror("错误", f"打开社区网站失败: {str(e)}")
-
 
 def main():
     root = tk.Tk()

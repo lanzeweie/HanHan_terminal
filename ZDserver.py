@@ -33,12 +33,8 @@ else:
 
 print(f"当前工作目录: {server_lujin}")
 
-# 检查是否为Windows商店应用路径
-is_windows_store_app = "WindowsApps" in server_lujin
-if is_windows_store_app:
-    print("检测到Windows商店应用路径，禁用日志写入功能")
-else:
-    print("检测到正常应用路径，启用日志写入功能")
+# 导入Windows应用检测模块
+from WindowsApp import setup_logging_for_app, is_windows_store_app
 
 # 日志压缩处理
 log_file = "last.log"
@@ -46,8 +42,11 @@ app_file = os.path.basename(sys.argv[0])
 zip_file_name = time.strftime("%Y_%m_%d_%H_%M_%S") + ".zip"
 log_dir = f"{server_lujin}{os.sep}log"
 
-# 根据路径判断是否启用日志功能
-if not is_windows_store_app:
+# 使用WindowsApp模块设置日志系统
+log_file_name = setup_logging_for_app(log_dir.replace(f"{server_lujin}{os.sep}", ""), log_file, server_lujin)
+
+# 如果启用了日志功能，进行日志压缩处理
+if log_file_name:
     os.makedirs(log_dir, exist_ok=True)
     if os.path.exists(f"{log_dir}{os.sep}{log_file}"):
         with zipfile.ZipFile(f"{log_dir}{os.sep}{zip_file_name}", 'w') as zf:
@@ -56,10 +55,6 @@ if not is_windows_store_app:
         with open(f"{log_dir}{os.sep}{log_file}", "w") as f:
             f.write("")
     log_file_name = f"{log_dir}{os.sep}{log_file}"
-else:
-    # Windows商店应用不使用日志文件
-    log_file_name = None
-    print("Windows商店应用模式：跳过日志文件创建")
 
 app = Flask(__name__)
 CORS(app)

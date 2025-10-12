@@ -343,7 +343,11 @@ class Taskbar():
         thread.start()
 
     def open_current_directory(server_lujin):
-        current_directory = server_lujin
+        from WindowsApp import get_detector
+        detector = get_detector(server_lujin)
+
+        # 获取适配后的目录路径
+        current_directory = detector.adapt_open_directory_function(server_lujin)
         os.startfile(current_directory)
 
     #退出程序
