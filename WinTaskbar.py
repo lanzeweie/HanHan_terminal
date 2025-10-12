@@ -892,7 +892,7 @@ class Taskbar():
             # 尝试加载二维码图片（优先使用 PIL 进行缩放）
             img_loaded = False
             img_path_candidates = [
-                os.path.join(server_lujin, "png", "qrcode_pc.woozooo.com.png"),
+                os.path.join(server_lujin, "data", "qrcode_pc.woozooo.com.png"),
             ]
             for img_path in img_path_candidates:
                 if os.path.exists(img_path):
