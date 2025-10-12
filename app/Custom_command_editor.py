@@ -294,7 +294,7 @@ class DeviceManagerDialog(tk.Toplevel):
         
         # 设置窗口大小
         window_width = 600
-        window_height = 500
+        window_height = 520
         self.resizable(True, True)
         self.transient(parent)
         self.grab_set()

@@ -853,7 +853,7 @@ class Taskbar():
     def show_mobile_download_menu(server_lujin):
         """
         弹出一个居中的窗口，显示移动端下载二维码、下载链接和密码，提供复制按钮。
-        优先从 server_lujin/png/qrcode_pc.woozooo.com.png 加载图片。
+        优先从 server_lujin/data/qrcode_pc.woozooo.com.png 加载图片。
         """
         def create_window():
             try:
@@ -862,20 +862,24 @@ class Taskbar():
                 Image = None
                 ImageTk = None
 
-            root = tk.Tk()
-            root.withdraw()
-            win = tk.Toplevel(root)
+            win = tk.Tk()  # 直接创建主窗口，避免左上角闪烁
             win.title("移动端下载")
             win.attributes("-topmost", True)
+            
+            # 先设置窗口大小和位置，避免闪烁
+            window_width, window_height = 380, 520
+            screen_width = win.winfo_screenwidth()
+            screen_height = win.winfo_screenheight()
+            x = (screen_width - window_width) // 2
+            y = (screen_height - window_height) // 2
+            win.geometry(f"{window_width}x{window_height}+{x}+{y}")
+            
             # 设置图标（可选）
             try:
                 icon = tk.PhotoImage(file=os.path.join(server_lujin, "data", "zhou.png"))
                 win.iconphoto(False, icon)
             except Exception:
                 pass
-
-            window_width, window_height = 380, 520
-            center_window(win, window_width, window_height)
 
             # 容器和样式
             main_frame = tk.Frame(win, padx=16, pady=12)
@@ -927,15 +931,15 @@ class Taskbar():
 
             def copy_url():
                 try:
-                    root.clipboard_clear()
-                    root.clipboard_append(url)
+                    win.clipboard_clear()
+                    win.clipboard_append(url)
                 except Exception as e:
                     messagebox.showinfo("复制失败", f"复制链接失败：{str(e)}")
 
             def copy_pwd():
                 try:
-                    root.clipboard_clear()
-                    root.clipboard_append(pwd)
+                    win.clipboard_clear()
+                    win.clipboard_append(pwd)
                 except Exception as e:
                     messagebox.showinfo("复制失败", f"复制密码失败：{str(e)}")
 
@@ -946,25 +950,18 @@ class Taskbar():
             copy_pwd_btn.pack(side=tk.LEFT, padx=8)
 
             # 关闭按钮
-            close_btn = tk.Button(main_frame, text="关闭", command=lambda: (win.destroy(), root.destroy()),
+            close_btn = tk.Button(main_frame, text="关闭", command=win.destroy,
                                   bg="#E0E0E0", fg="#333333", font=("Helvetica", 11), relief=tk.FLAT, bd=0, padx=12, pady=6)
             close_btn.pack(pady=(10, 4))
 
             def on_close():
-                try:
-                    win.destroy()
-                finally:
-                    try:
-                        root.destroy()
-                    except:
-                        pass
+                win.destroy()
 
             win.protocol("WM_DELETE_WINDOW", on_close)
             win.mainloop()
 
         thread = threading.Thread(target=create_window, daemon=True)
         thread.start()
-
     # 打开使用教程图片 LookMe.png
     def open_intro_menu(server_lujin):
         try:
