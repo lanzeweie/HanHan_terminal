@@ -197,3 +197,236 @@ def setup_logging_for_app(log_dir="log", log_file="last.log", app_path=None):
         str or None: 日志文件路径，WindowsApp应用返回None
     """
     return get_detector(app_path).setup_logging(log_dir, log_file)
+
+
+class WindowsStartupTaskManager:
+    """
+    Windows应用启动任务管理器
+    使用WinRT API管理WindowsApp应用的启动任务
+    """
+
+    def __init__(self, task_id="ZDserver"):
+        """
+        初始化启动任务管理器
+
+        Args:
+            task_id (str): 启动任务的ID，默认为"ZDserver"
+        """
+        self.task_id = task_id
+        self._startup_task = None
+        self._is_winrt_available = self._check_winrt_availability()
+
+    def _check_winrt_availability(self):
+        """检查WinRT API是否可用"""
+        try:
+            import winsdk
+            return True
+        except ImportError:
+            print("警告: winsdk库未安装，无法使用WinRT启动任务管理功能")
+            return False
+
+    def _get_startup_task(self):
+        """获取启动任务对象"""
+        if not self._is_winrt_available:
+            return None
+
+        if self._startup_task is None:
+            try:
+                from winsdk.windows.applicationmodel.startup import StartupTask, StartupTaskState
+
+                # 通过TaskId获取启动任务
+                self._startup_task = StartupTask.get_async(self.task_id).get_result()
+                return self._startup_task
+            except Exception as e:
+                print(f"获取启动任务失败: {str(e)}")
+                return None
+        return self._startup_task
+
+    def is_startup_enabled(self):
+        """
+        检查启动任务是否已启用
+
+        Returns:
+            str: "surr"表示已启用，"null"表示未启用或发生错误
+        """
+        if not self._is_winrt_available:
+            return "null"
+
+        try:
+            startup_task = self._get_startup_task()
+            if startup_task is None:
+                return "null"
+
+            from winsdk.windows.applicationmodel.startup import StartupTaskState
+
+            if startup_task.state == StartupTaskState.ENABLED:
+                print(f"启动任务 {self.task_id} 已启用")
+                return "surr"
+            elif startup_task.state == StartupTaskState.DISABLED:
+                print(f"启动任务 {self.task_id} 已禁用")
+                return "null"
+            elif startup_task.state == StartupTaskState.DISABLED_BY_USER:
+                print(f"启动任务 {self.task_id} 被用户禁用")
+                return "null"
+            else:
+                print(f"启动任务 {self.task_id} 状态未知")
+                return "null"
+        except Exception as e:
+            print(f"检查启动任务状态时发生错误: {str(e)}")
+            return "null"
+
+    def get_startup_menu_name(self):
+        """
+        获取启动菜单显示名称
+
+        Returns:
+            str: 格式化的启动菜单名称
+        """
+        status = self.is_startup_enabled()
+        if status == "surr":
+            return "开机启动 【√】"
+        else:
+            return "开机启动 【X】"
+
+    def enable_startup(self):
+        """
+        启用启动任务
+
+        Returns:
+            bool: True表示成功，False表示失败
+        """
+        if not self._is_winrt_available:
+            print("WinRT API不可用，无法启用启动任务")
+            return False
+
+        try:
+            startup_task = self._get_startup_task()
+            if startup_task is None:
+                print("无法获取启动任务对象")
+                return False
+
+            from winsdk.windows.applicationmodel.startup import StartupTaskState
+
+            # 检查当前状态
+            if startup_task.state == StartupTaskState.ENABLED:
+                print(f"启动任务 {self.task_id} 已经启用")
+                return True
+
+            # 请求启用启动任务
+            result = startup_task.request_enable_async().get_result()
+
+            if result == StartupTaskState.ENABLED:
+                print(f"成功启用启动任务 {self.task_id}")
+                return True
+            else:
+                print(f"启用启动任务失败，当前状态: {result}")
+                return False
+
+        except Exception as e:
+            print(f"启用启动任务时发生错误: {str(e)}")
+            return False
+
+    def disable_startup(self):
+        """
+        禁用启动任务
+
+        Returns:
+            bool: True表示成功，False表示失败
+        """
+        if not self._is_winrt_available:
+            print("WinRT API不可用，无法禁用启动任务")
+            return False
+
+        try:
+            startup_task = self._get_startup_task()
+            if startup_task is None:
+                print("无法获取启动任务对象")
+                return False
+
+            from winsdk.windows.applicationmodel.startup import StartupTaskState
+
+            # 检查当前状态
+            if startup_task.state == StartupTaskState.DISABLED:
+                print(f"启动任务 {self.task_id} 已经禁用")
+                return True
+
+            # 禁用启动任务
+            startup_task.disable()
+            print(f"成功禁用启动任务 {self.task_id}")
+            return True
+
+        except Exception as e:
+            print(f"禁用启动任务时发生错误: {str(e)}")
+            return False
+
+    def toggle_startup(self):
+        """
+        切换启动任务状态
+
+        Returns:
+            bool: True表示操作成功，False表示操作失败
+        """
+        current_status = self.is_startup_enabled()
+        if current_status == "surr":
+            return self.disable_startup()
+        else:
+            return self.enable_startup()
+
+
+# 全局启动任务管理器实例
+_global_startup_manager = None
+
+
+def get_startup_manager(task_id="ZDserver"):
+    """
+    获取全局启动任务管理器实例
+
+    Args:
+        task_id (str): 启动任务ID，默认为"ZDserver"
+
+    Returns:
+        WindowsStartupTaskManager: 启动任务管理器实例
+    """
+    global _global_startup_manager
+    if _global_startup_manager is None:
+        _global_startup_manager = WindowsStartupTaskManager(task_id)
+    return _global_startup_manager
+
+
+def is_winrt_startup_enabled(task_id="ZDserver"):
+    """
+    便捷函数：检查WinRT启动任务是否已启用
+
+    Args:
+        task_id (str): 启动任务ID
+
+    Returns:
+        str: "surr"表示已启用，"null"表示未启用
+    """
+    return get_startup_manager(task_id).is_startup_enabled()
+
+
+def get_winrt_startup_menu_name(task_id="ZDserver"):
+    """
+    便捷函数：获取WinRT启动任务菜单名称
+
+    Args:
+        task_id (str): 启动任务ID
+
+    Returns:
+        str: 格式化的菜单名称
+    """
+    return get_startup_manager(task_id).get_startup_menu_name()
+
+
+def toggle_winrt_startup(task_id="ZDserver"):
+    """
+    便捷函数：切换WinRT启动任务状态
+
+    Args:
+        task_id (str): 启动任务ID
+
+    Returns:
+        bool: True表示操作成功
+    """
+    return get_startup_manager(task_id).toggle_startup()

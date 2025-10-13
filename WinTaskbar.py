@@ -478,12 +478,19 @@ class Taskbar():
 
     #--------------------------------------------设置开机启动-------------------------------------------------------------
     def command_bootup_menu_name(app_name):
-        startup_wenbenzhi = Taskbar.command_bootup_menu_check_startup(app_name)
-        if startup_wenbenzhi == "surr":
-            startup_wenbenzhi_wenben = "开机启动 【√】"
-        elif startup_wenbenzhi == "null":
-            startup_wenbenzhi_wenben = "开机启动 【X】"
-        return startup_wenbenzhi_wenben
+        # 检测是否为WindowsApp应用，使用不同的启动管理方式
+        from WindowsApp import is_windows_store_app, get_winrt_startup_menu_name
+        if is_windows_store_app():
+            # WindowsApp应用使用WinRT API
+            return get_winrt_startup_menu_name("ZDserver")
+        else:
+            # 普通应用使用注册表方式
+            startup_wenbenzhi = Taskbar.command_bootup_menu_check_startup(app_name)
+            if startup_wenbenzhi == "surr":
+                startup_wenbenzhi_wenben = "开机启动 【√】"
+            elif startup_wenbenzhi == "null":
+                startup_wenbenzhi_wenben = "开机启动 【X】"
+            return startup_wenbenzhi_wenben
     
     def command_bootup_menu_check_startup(app_name):
         reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_READ)
@@ -498,12 +505,21 @@ class Taskbar():
     
     #更新小任务栏程序的右键菜单
     def command_bootup_menu_startup_shifouqidong(app_name, server_lujin,app_file):
-        if Taskbar.command_bootup_menu_check_startup(app_name) == "surr":
-            Taskbar.command_bootup_menu_remove_from_startup(app_name)
-            Taskbar.meun_dongtai(app_name, server_lujin,app_file)
-        elif Taskbar.command_bootup_menu_check_startup(app_name) == "null":
-            Taskbar.command_bootup_menu_add_to_startup(app_name, f"{server_lujin}{os.sep}{app_file}")
-            Taskbar.meun_dongtai(app_name, server_lujin,app_file)
+        # 检测是否为WindowsApp应用，使用不同的启动管理方式
+        from WindowsApp import is_windows_store_app, toggle_winrt_startup
+        if is_windows_store_app():
+            # WindowsApp应用使用WinRT API
+            success = toggle_winrt_startup("ZDserver")
+            if success:
+                Taskbar.meun_dongtai(app_name, server_lujin,app_file)
+        else:
+            # 普通应用使用注册表方式
+            if Taskbar.command_bootup_menu_check_startup(app_name) == "surr":
+                Taskbar.command_bootup_menu_remove_from_startup(app_name)
+                Taskbar.meun_dongtai(app_name, server_lujin,app_file)
+            elif Taskbar.command_bootup_menu_check_startup(app_name) == "null":
+                Taskbar.command_bootup_menu_add_to_startup(app_name, f"{server_lujin}{os.sep}{app_file}")
+                Taskbar.meun_dongtai(app_name, server_lujin,app_file)
 
 
     #删除
