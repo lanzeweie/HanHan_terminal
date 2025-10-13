@@ -205,12 +205,12 @@ class WindowsStartupTaskManager:
     使用WinRT API管理WindowsApp应用的启动任务
     """
 
-    def __init__(self, task_id="ZDserver"):
+    def __init__(self, task_id="涵涵的控制面板"):
         """
         初始化启动任务管理器
 
         Args:
-            task_id (str): 启动任务的ID，默认为"ZDserver"
+            task_id (str): 启动任务的ID，默认为"涵涵的控制面板"
         """
         self.task_id = task_id
         self._startup_task = None
@@ -232,7 +232,8 @@ class WindowsStartupTaskManager:
 
         if self._startup_task is None:
             try:
-                from winsdk.windows.applicationmodel.startup import StartupTask, StartupTaskState
+                from winsdk.windows.applicationmodel.startup import (
+                    StartupTask, StartupTaskState)
 
                 # 通过TaskId获取启动任务
                 self._startup_task = StartupTask.get_async(self.task_id).get_result()
@@ -257,7 +258,8 @@ class WindowsStartupTaskManager:
             if startup_task is None:
                 return "null"
 
-            from winsdk.windows.applicationmodel.startup import StartupTaskState
+            from winsdk.windows.applicationmodel.startup import \
+                StartupTaskState
 
             if startup_task.state == StartupTaskState.ENABLED:
                 print(f"启动任务 {self.task_id} 已启用")
@@ -305,7 +307,8 @@ class WindowsStartupTaskManager:
                 print("无法获取启动任务对象")
                 return False
 
-            from winsdk.windows.applicationmodel.startup import StartupTaskState
+            from winsdk.windows.applicationmodel.startup import \
+                StartupTaskState
 
             # 检查当前状态
             if startup_task.state == StartupTaskState.ENABLED:
@@ -343,7 +346,8 @@ class WindowsStartupTaskManager:
                 print("无法获取启动任务对象")
                 return False
 
-            from winsdk.windows.applicationmodel.startup import StartupTaskState
+            from winsdk.windows.applicationmodel.startup import \
+                StartupTaskState
 
             # 检查当前状态
             if startup_task.state == StartupTaskState.DISABLED:
