@@ -202,7 +202,7 @@ def setup_logging_for_app(log_dir="log", log_file="last.log", app_path=None):
 class WindowsStartupTaskManager:
     """
     Windows应用启动任务管理器
-    使用WinRT API管理WindowsApp应用的启动任务
+    使用winrt库管理Windows Store应用的启动任务
     """
 
     def __init__(self, task_id="涵涵的控制面板"):
@@ -214,34 +214,76 @@ class WindowsStartupTaskManager:
         """
         self.task_id = task_id
         self._startup_task = None
-        self._is_winrt_available = self._check_winrt_availability()
-
-    def _check_winrt_availability(self):
-        """检查WinRT API是否可用"""
-        try:
-            import winsdk
-            return True
-        except ImportError:
-            print("警告: winsdk库未安装，无法使用WinRT启动任务管理功能")
-            return False
 
     def _get_startup_task(self):
         """获取启动任务对象"""
-        if not self._is_winrt_available:
-            return None
-
         if self._startup_task is None:
             try:
-                from winsdk.windows.applicationmodel.startup import (
-                    StartupTask, StartupTaskState)
+                from winrt.windows.applicationmodel import StartupTask
 
                 # 通过TaskId获取启动任务
                 self._startup_task = StartupTask.get_async(self.task_id).get_result()
                 return self._startup_task
             except Exception as e:
                 print(f"获取启动任务失败: {str(e)}")
+                print("注意: Windows Store应用的启动任务需要在有包身份的环境下访问")
                 return None
         return self._startup_task
+
+    def _get_registry_startup_entry(self):
+        """获取注册表中的启动项（用于普通应用模式）"""
+        import winreg
+        try:
+            # 打开启动注册表项
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                              r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
+                              0, winreg.KEY_READ)
+
+            # 尝试读取我们的启动项
+            try:
+                value, _ = winreg.QueryValueEx(key, self.task_id)
+                winreg.CloseKey(key)
+                return {"path": value, "exists": True}
+            except FileNotFoundError:
+                winreg.CloseKey(key)
+                return {"exists": False}
+        except Exception as e:
+            print(f"读取注册表失败: {str(e)}")
+            return {"exists": False}
+
+    def _set_registry_startup(self, enable=True):
+        """设置注册表中的启动项（用于普通应用模式）"""
+        import winreg
+        try:
+            # 打开启动注册表项
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                              r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
+                              0, winreg.KEY_SET_VALUE)
+
+            if enable:
+                # 获取当前程序路径
+                import sys
+                if getattr(sys, 'frozen', False):
+                    exe_path = sys.executable
+                else:
+                    exe_path = sys.argv[0]
+
+                # 设置启动项
+                winreg.SetValueEx(key, self.task_id, 0, winreg.REG_SZ, exe_path)
+                print(f"已添加启动项: {self.task_id}")
+            else:
+                # 删除启动项
+                try:
+                    winreg.DeleteValue(key, self.task_id)
+                    print(f"已删除启动项: {self.task_id}")
+                except FileNotFoundError:
+                    print(f"启动项不存在: {self.task_id}")
+
+            winreg.CloseKey(key)
+            return True
+        except Exception as e:
+            print(f"设置注册表失败: {str(e)}")
+            return False
 
     def is_startup_enabled(self):
         """
@@ -250,16 +292,12 @@ class WindowsStartupTaskManager:
         Returns:
             str: "surr"表示已启用，"null"表示未启用或发生错误
         """
-        if not self._is_winrt_available:
-            return "null"
-
         try:
             startup_task = self._get_startup_task()
             if startup_task is None:
                 return "null"
 
-            from winsdk.windows.applicationmodel.startup import \
-                StartupTaskState
+            from winrt.windows.applicationmodel import StartupTaskState
 
             if startup_task.state == StartupTaskState.ENABLED:
                 print(f"启动任务 {self.task_id} 已启用")
@@ -297,18 +335,13 @@ class WindowsStartupTaskManager:
         Returns:
             bool: True表示成功，False表示失败
         """
-        if not self._is_winrt_available:
-            print("WinRT API不可用，无法启用启动任务")
-            return False
-
         try:
             startup_task = self._get_startup_task()
             if startup_task is None:
                 print("无法获取启动任务对象")
                 return False
 
-            from winsdk.windows.applicationmodel.startup import \
-                StartupTaskState
+            from winrt.windows.applicationmodel import StartupTaskState
 
             # 检查当前状态
             if startup_task.state == StartupTaskState.ENABLED:
@@ -336,18 +369,13 @@ class WindowsStartupTaskManager:
         Returns:
             bool: True表示成功，False表示失败
         """
-        if not self._is_winrt_available:
-            print("WinRT API不可用，无法禁用启动任务")
-            return False
-
         try:
             startup_task = self._get_startup_task()
             if startup_task is None:
                 print("无法获取启动任务对象")
                 return False
 
-            from winsdk.windows.applicationmodel.startup import \
-                StartupTaskState
+            from winrt.windows.applicationmodel import StartupTaskState
 
             # 检查当前状态
             if startup_task.state == StartupTaskState.DISABLED:
@@ -434,3 +462,31 @@ def toggle_winrt_startup(task_id="ZDserver"):
         bool: True表示操作成功
     """
     return get_startup_manager(task_id).toggle_startup()
+
+
+if __name__ == "__main__":
+    # 假定在WindowsApp环境中运行
+    # WindowsAppDetector通过路径中是否包含"WindowsApps"来判断
+    print("--- 模拟在WindowsApp环境中运行 ---")
+    simulated_app_path = "C:\\Program Files\\WindowsApps\\YourApp_1.0.0.0_x64__randomstring\\app.exe"
+    
+    # 初始化检测器以模拟环境
+    detector = get_detector(app_path=simulated_app_path)
+    
+    # 检查并显示安全目录
+    safe_path = detector.get_safe_directory_path()
+    print(f"安全目录路径: {safe_path}")
+
+    # 检查日志功能状态
+    log_path = detector.setup_logging()
+    if log_path:
+        print(f"日志文件路径: {log_path}")
+    
+    print("\n--- 显示启动任务状态 ---")
+    # 使用在您项目中指定的任务ID "涵涵的控制面板"
+    # 注意：如果winsdk未安装，将显示警告并返回默认的“禁用”状态
+    startup_manager = WindowsStartupTaskManager(task_id="涵涵的控制面板")
+    
+    # 获取格式化后的菜单名称并打印
+    menu_name = startup_manager.get_startup_menu_name()
+    print(f"启动任务状态菜单显示为: {menu_name}")
