@@ -143,7 +143,7 @@ _global_detector = None
 
 def get_detector(app_path=None):
     """
-    获取全局Windows应用检测器实例
+    获取Windows应用检测器实例
 
     Args:
         app_path (str, optional): 应用程序路径
@@ -152,8 +152,12 @@ def get_detector(app_path=None):
         WindowsAppDetector: 检测器实例
     """
     global _global_detector
+    # 如果提供了特定路径，创建新的检测器实例
+    if app_path is not None:
+        return WindowsAppDetector(app_path)
+    # 否则使用全局实例
     if _global_detector is None:
-        _global_detector = WindowsAppDetector(app_path)
+        _global_detector = WindowsAppDetector()
     return _global_detector
 
 
@@ -202,7 +206,8 @@ def setup_logging_for_app(log_dir="log", log_file="last.log", app_path=None):
 class WindowsStartupTaskManager:
     """
     Windows应用启动任务管理器
-    使用winrt库管理Windows Store应用的启动任务
+    对于普通应用使用注册表管理启动任务
+    对于WindowsApp应用禁用启动管理功能
     """
 
     def __init__(self, task_id="涵涵的控制面板"):
@@ -213,25 +218,17 @@ class WindowsStartupTaskManager:
             task_id (str): 启动任务的ID，默认为"涵涵的控制面板"
         """
         self.task_id = task_id
-        self._startup_task = None
+        self._is_windows_store_app = None
 
-    def _get_startup_task(self):
-        """获取启动任务对象"""
-        if self._startup_task is None:
-            try:
-                from winrt.windows.applicationmodel import StartupTask
-
-                # 通过TaskId获取启动任务
-                self._startup_task = StartupTask.get_async(self.task_id).get_result()
-                return self._startup_task
-            except Exception as e:
-                print(f"获取启动任务失败: {str(e)}")
-                print("注意: Windows Store应用的启动任务需要在有包身份的环境下访问")
-                return None
-        return self._startup_task
+    def _is_windows_app(self):
+        """检测是否为WindowsApp应用"""
+        if self._is_windows_store_app is None:
+            detector = get_detector()
+            self._is_windows_store_app = detector.is_windows_store_app()
+        return self._is_windows_store_app
 
     def _get_registry_startup_entry(self):
-        """获取注册表中的启动项（用于普通应用模式）"""
+        """获取注册表中的启动项"""
         import winreg
         try:
             # 打开启动注册表项
@@ -252,7 +249,7 @@ class WindowsStartupTaskManager:
             return {"exists": False}
 
     def _set_registry_startup(self, enable=True):
-        """设置注册表中的启动项（用于普通应用模式）"""
+        """设置注册表中的启动项"""
         import winreg
         try:
             # 打开启动注册表项
@@ -292,24 +289,19 @@ class WindowsStartupTaskManager:
         Returns:
             str: "surr"表示已启用，"null"表示未启用或发生错误
         """
+        # WindowsApp应用不支持启动管理功能
+        if self._is_windows_app():
+            print(f"WindowsApp应用不支持启动管理功能: {self.task_id}")
+            return "null"
+
+        # 普通应用使用注册表方式
         try:
-            startup_task = self._get_startup_task()
-            if startup_task is None:
-                return "null"
-
-            from winrt.windows.applicationmodel import StartupTaskState
-
-            if startup_task.state == StartupTaskState.ENABLED:
-                print(f"启动任务 {self.task_id} 已启用")
+            startup_entry = self._get_registry_startup_entry()
+            if startup_entry.get("exists"):
+                print(f"注册表启动任务 {self.task_id} 已启用")
                 return "surr"
-            elif startup_task.state == StartupTaskState.DISABLED:
-                print(f"启动任务 {self.task_id} 已禁用")
-                return "null"
-            elif startup_task.state == StartupTaskState.DISABLED_BY_USER:
-                print(f"启动任务 {self.task_id} 被用户禁用")
-                return "null"
             else:
-                print(f"启动任务 {self.task_id} 状态未知")
+                print(f"启动任务 {self.task_id} 未启用")
                 return "null"
         except Exception as e:
             print(f"检查启动任务状态时发生错误: {str(e)}")
@@ -335,32 +327,13 @@ class WindowsStartupTaskManager:
         Returns:
             bool: True表示成功，False表示失败
         """
-        try:
-            startup_task = self._get_startup_task()
-            if startup_task is None:
-                print("无法获取启动任务对象")
-                return False
-
-            from winrt.windows.applicationmodel import StartupTaskState
-
-            # 检查当前状态
-            if startup_task.state == StartupTaskState.ENABLED:
-                print(f"启动任务 {self.task_id} 已经启用")
-                return True
-
-            # 请求启用启动任务
-            result = startup_task.request_enable_async().get_result()
-
-            if result == StartupTaskState.ENABLED:
-                print(f"成功启用启动任务 {self.task_id}")
-                return True
-            else:
-                print(f"启用启动任务失败，当前状态: {result}")
-                return False
-
-        except Exception as e:
-            print(f"启用启动任务时发生错误: {str(e)}")
+        # WindowsApp应用不支持启动管理功能
+        if self._is_windows_app():
+            print(f"WindowsApp应用不支持启动管理功能: {self.task_id}")
             return False
+
+        # 普通应用使用注册表方式
+        return self._set_registry_startup(enable=True)
 
     def disable_startup(self):
         """
@@ -369,27 +342,13 @@ class WindowsStartupTaskManager:
         Returns:
             bool: True表示成功，False表示失败
         """
-        try:
-            startup_task = self._get_startup_task()
-            if startup_task is None:
-                print("无法获取启动任务对象")
-                return False
-
-            from winrt.windows.applicationmodel import StartupTaskState
-
-            # 检查当前状态
-            if startup_task.state == StartupTaskState.DISABLED:
-                print(f"启动任务 {self.task_id} 已经禁用")
-                return True
-
-            # 禁用启动任务
-            startup_task.disable()
-            print(f"成功禁用启动任务 {self.task_id}")
-            return True
-
-        except Exception as e:
-            print(f"禁用启动任务时发生错误: {str(e)}")
+        # WindowsApp应用不支持启动管理功能
+        if self._is_windows_app():
+            print(f"WindowsApp应用不支持启动管理功能: {self.task_id}")
             return False
+
+        # 普通应用使用注册表方式
+        return self._set_registry_startup(enable=False)
 
     def toggle_startup(self):
         """
@@ -398,6 +357,11 @@ class WindowsStartupTaskManager:
         Returns:
             bool: True表示操作成功，False表示操作失败
         """
+        # WindowsApp应用不支持启动管理功能
+        if self._is_windows_app():
+            print(f"WindowsApp应用不支持启动管理功能: {self.task_id}")
+            return False
+
         current_status = self.is_startup_enabled()
         if current_status == "surr":
             return self.disable_startup()
@@ -411,7 +375,7 @@ _global_startup_manager = None
 
 def get_startup_manager(task_id="ZDserver"):
     """
-    获取全局启动任务管理器实例
+    获取启动任务管理器实例
 
     Args:
         task_id (str): 启动任务ID，默认为"ZDserver"
@@ -425,9 +389,9 @@ def get_startup_manager(task_id="ZDserver"):
     return _global_startup_manager
 
 
-def is_winrt_startup_enabled(task_id="ZDserver"):
+def is_startup_enabled(task_id="ZDserver"):
     """
-    便捷函数：检查WinRT启动任务是否已启用
+    便捷函数：检查启动任务是否已启用
 
     Args:
         task_id (str): 启动任务ID
@@ -438,9 +402,9 @@ def is_winrt_startup_enabled(task_id="ZDserver"):
     return get_startup_manager(task_id).is_startup_enabled()
 
 
-def get_winrt_startup_menu_name(task_id="ZDserver"):
+def get_startup_menu_name(task_id="ZDserver"):
     """
-    便捷函数：获取WinRT启动任务菜单名称
+    便捷函数：获取启动任务菜单名称
 
     Args:
         task_id (str): 启动任务ID
@@ -451,9 +415,9 @@ def get_winrt_startup_menu_name(task_id="ZDserver"):
     return get_startup_manager(task_id).get_startup_menu_name()
 
 
-def toggle_winrt_startup(task_id="ZDserver"):
+def toggle_startup(task_id="ZDserver"):
     """
-    便捷函数：切换WinRT启动任务状态
+    便捷函数：切换启动任务状态
 
     Args:
         task_id (str): 启动任务ID
@@ -464,15 +428,31 @@ def toggle_winrt_startup(task_id="ZDserver"):
     return get_startup_manager(task_id).toggle_startup()
 
 
+# 为了向后兼容，保留旧的函数名
+def is_winrt_startup_enabled(task_id="ZDserver"):
+    """向后兼容：检查启动任务是否已启用"""
+    return is_startup_enabled(task_id)
+
+
+def get_winrt_startup_menu_name(task_id="ZDserver"):
+    """向后兼容：获取启动任务菜单名称"""
+    return get_startup_menu_name(task_id)
+
+
+def toggle_winrt_startup(task_id="ZDserver"):
+    """向后兼容：切换启动任务状态"""
+    return toggle_startup(task_id)
+
+
 if __name__ == "__main__":
     # 假定在WindowsApp环境中运行
     # WindowsAppDetector通过路径中是否包含"WindowsApps"来判断
     print("--- 模拟在WindowsApp环境中运行 ---")
     simulated_app_path = "C:\\Program Files\\WindowsApps\\YourApp_1.0.0.0_x64__randomstring\\app.exe"
-    
+
     # 初始化检测器以模拟环境
     detector = get_detector(app_path=simulated_app_path)
-    
+
     # 检查并显示安全目录
     safe_path = detector.get_safe_directory_path()
     print(f"安全目录路径: {safe_path}")
@@ -481,12 +461,12 @@ if __name__ == "__main__":
     log_path = detector.setup_logging()
     if log_path:
         print(f"日志文件路径: {log_path}")
-    
+
     print("\n--- 显示启动任务状态 ---")
     # 使用在您项目中指定的任务ID "涵涵的控制面板"
-    # 注意：如果winsdk未安装，将显示警告并返回默认的“禁用”状态
+    # 对于WindowsApp应用，启动管理功能被禁用
     startup_manager = WindowsStartupTaskManager(task_id="涵涵的控制面板")
-    
+
     # 获取格式化后的菜单名称并打印
     menu_name = startup_manager.get_startup_menu_name()
     print(f"启动任务状态菜单显示为: {menu_name}")

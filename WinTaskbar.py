@@ -84,9 +84,12 @@ class Taskbar():
 
         #动态菜单选项
         # 当前设备
-        name_menu = pystray.MenuItem(f"当前设备：{Taskbar.shebei_name(self.server_lujin)}", lambda item: Taskbar.shebei_name_xiugai(app_name_taskbar, server_lujin_taskbar,app_file_taskbar))  
-        # 开机启动
-        command_bootup_menu = pystray.MenuItem(Taskbar.command_bootup_menu_name(self.app_name), lambda item: Taskbar.command_bootup_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
+        name_menu = pystray.MenuItem(f"当前设备：{Taskbar.shebei_name(self.server_lujin)}", lambda item: Taskbar.shebei_name_xiugai(app_name_taskbar, server_lujin_taskbar,app_file_taskbar))
+        # 开机启动（如果为None则不创建此菜单项）
+        bootup_menu_name = Taskbar.command_bootup_menu_name(self.app_name)
+        command_bootup_menu = None
+        if bootup_menu_name is not None:
+            command_bootup_menu = pystray.MenuItem(bootup_menu_name, lambda item: Taskbar.command_bootup_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
         # 亮度控制
         command_AudioBrightnes_menu = pystray.MenuItem(Taskbar.command_AudioBrightnes_menu_name(self.app_name,self.server_lujin), lambda item: Taskbar.command_AudioBrightnes_menu_startup_shifouqidong(app_name_taskbar,server_lujin_taskbar,app_file_taskbar))
         # 仅授权设备
@@ -113,7 +116,8 @@ class Taskbar():
             lambda item: threading.Thread(target=Taskbar.check_for_updates).start()
         )
 
-        menu = (
+        # 构建基础菜单列表
+        menu_items = [
             name_menu,
             app_open_custom_menu,
             pystray.Menu.SEPARATOR,  # 添加安全选项分隔符
@@ -121,14 +125,23 @@ class Taskbar():
             command_OrderlistAuth_menu,
             pystray.Menu.SEPARATOR,  # 添加分隔符
             command_AudioBrightnes_menu,
-            command_bootup_menu,
+        ]
+
+        # 只有普通应用才添加开机启动菜单项
+        if command_bootup_menu is not None:
+            menu_items.append(command_bootup_menu)
+
+        # 添加剩余菜单项
+        menu_items.extend([
             open_catalogue_menu,
             pystray.Menu.SEPARATOR,  # 添加分隔符
             check_update_menu,  # 添加此行
             mobile_download_menu,  # 新增：移动端下载菜单项（位于检查更新下方、退出上方）
             intro_menu,  # 新增：使用教程（位于移动端下载下方，退出上方）
             command_exit_menu,
-        )
+        ])
+
+        menu = tuple(menu_items)
         #声明 global serve_windows_mix_icon 是全局变量
         image = Image.open(f"{self.server_lujin}/data/zhou.png")
         self.serve_windows_mix_icon = pystray.Icon("name", image, 
@@ -242,14 +255,19 @@ class Taskbar():
     @classmethod  # 修改为类方法
     def meun_dongtai(cls, app_name, server_lujin, app_file):  # 添加cls参数
         # 动态菜单选项（原有代码保持不动）
-        name_menu = pystray.MenuItem(f"当前设备：{Taskbar.shebei_name(server_lujin)}", lambda item: Taskbar.shebei_name_xiugai(app_name, server_lujin, app_file))  
-        command_bootup_menu = pystray.MenuItem(Taskbar.command_bootup_menu_name(app_name), lambda item: Taskbar.command_bootup_menu_startup_shifouqidong(app_name, server_lujin, app_file))
+        name_menu = pystray.MenuItem(f"当前设备：{Taskbar.shebei_name(server_lujin)}", lambda item: Taskbar.shebei_name_xiugai(app_name, server_lujin, app_file))
+        # 开机启动（如果为None则不创建此菜单项）
+        bootup_menu_name = Taskbar.command_bootup_menu_name(app_name)
+        command_bootup_menu = None
+        if bootup_menu_name is not None:
+            command_bootup_menu = pystray.MenuItem(bootup_menu_name, lambda item: Taskbar.command_bootup_menu_startup_shifouqidong(app_name, server_lujin, app_file))
+
         command_AudioBrightnes_menu = pystray.MenuItem(Taskbar.command_AudioBrightnes_menu_name(app_name,server_lujin), lambda item: Taskbar.command_AudioBrightnes_menu_startup_shifouqidong(app_name, server_lujin, app_file))
         command_Devices_menu = pystray.MenuItem(Taskbar.command_devices_menu_name(app_name,server_lujin), lambda item: Taskbar.command_devices_menu_startup_shifouqidong(app_name, server_lujin, app_file))
         command_OrderlistAuth_menu = pystray.MenuItem(Taskbar.command_orderlist_auth_menu_name(app_name,server_lujin), lambda item: Taskbar.command_orderlist_auth_startup_shifouqidong(app_name, server_lujin, app_file))
-        
-        # 更新菜单结构，添加分隔符和新选项
-        menu = (
+
+        # 构建基础菜单列表
+        menu_items = [
             name_menu,
             pystray.MenuItem(f"自定义命令菜单", lambda item: Taskbar.app_open_customeditor_menu(server_lujin)),
             pystray.Menu.SEPARATOR,  # 添加安全选项分隔符
@@ -257,14 +275,23 @@ class Taskbar():
             command_OrderlistAuth_menu,
             pystray.Menu.SEPARATOR,  # 添加分隔符
             command_AudioBrightnes_menu,
-            command_bootup_menu,
+        ]
+
+        # 只有普通应用才添加开机启动菜单项
+        if command_bootup_menu is not None:
+            menu_items.append(command_bootup_menu)
+
+        # 添加剩余菜单项
+        menu_items.extend([
             pystray.MenuItem("打开目录", lambda item: Taskbar.open_current_directory(server_lujin)),
             pystray.Menu.SEPARATOR,  # 添加分隔符
             pystray.MenuItem("检查更新", lambda item: threading.Thread(target=Taskbar.check_for_updates).start()),
             pystray.MenuItem("移动端下载", lambda item: threading.Thread(target=Taskbar.show_mobile_download_menu, args=(server_lujin,), daemon=True).start()),
             pystray.MenuItem("使用教程", lambda item: threading.Thread(target=Taskbar.open_intro_menu, args=(server_lujin,), daemon=True).start()),
             pystray.MenuItem("退出", lambda item: Taskbar.command_exit_menu()),
-        )
+        ])
+
+        menu = tuple(menu_items)
 
         # 通过单例实例访问
         instance = cls.get_instance()  # 新增此行
@@ -478,11 +505,11 @@ class Taskbar():
 
     #--------------------------------------------设置开机启动-------------------------------------------------------------
     def command_bootup_menu_name(app_name):
-        # 检测是否为WindowsApp应用，使用不同的启动管理方式
-        from WindowsApp import is_windows_store_app, get_winrt_startup_menu_name
+        # 检测是否为WindowsApp应用
+        from WindowsApp import is_windows_store_app
         if is_windows_store_app():
-            # WindowsApp应用使用WinRT API
-            return get_winrt_startup_menu_name("ZDserver")
+            # WindowsApp应用不支持开机启动管理功能
+            return None  # 返回None表示不显示此菜单项
         else:
             # 普通应用使用注册表方式
             startup_wenbenzhi = Taskbar.command_bootup_menu_check_startup(app_name)
@@ -505,13 +532,12 @@ class Taskbar():
     
     #更新小任务栏程序的右键菜单
     def command_bootup_menu_startup_shifouqidong(app_name, server_lujin,app_file):
-        # 检测是否为WindowsApp应用，使用不同的启动管理方式
-        from WindowsApp import is_windows_store_app, toggle_winrt_startup
+        # 检测是否为WindowsApp应用
+        from WindowsApp import is_windows_store_app
         if is_windows_store_app():
-            # WindowsApp应用使用WinRT API
-            success = toggle_winrt_startup("ZDserver")
-            if success:
-                Taskbar.meun_dongtai(app_name, server_lujin,app_file)
+            # WindowsApp应用不支持开机启动管理功能，不执行任何操作
+            print("WindowsApp应用不支持开机启动管理功能")
+            return
         else:
             # 普通应用使用注册表方式
             if Taskbar.command_bootup_menu_check_startup(app_name) == "surr":
