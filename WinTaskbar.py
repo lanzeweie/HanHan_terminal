@@ -197,16 +197,27 @@ class Taskbar():
             alert_window = tk.Toplevel(root)
             alert_window.title("陌生设备发起请求")
             alert_window.attributes("-topmost", True)
-            # 设置窗口图标
+
+            # 使用 server_lujin_taskbar 下的 data/zhou.png（回退到模块 data/zhou.png）
+            server_path = globals().get('server_lujin_taskbar')
+            if server_path:
+                icon_path = os.path.join(server_path, "data", "zhou.png")
+            else:
+                icon_path = os.path.join(os.path.dirname(__file__), "data", "zhou.png")
             try:
-                icon = tk.PhotoImage(file="data/zhou.png")
+                icon = tk.PhotoImage(file=icon_path)
                 alert_window.iconphoto(False, icon)
-            except tk.TclError:
-                print("图标文件加载失败，确保路径正确且文件存在。")
-                
+            except Exception:
+                try:
+                    # 最后回退到相对路径
+                    icon = tk.PhotoImage(file="data/zhou.png")
+                    alert_window.iconphoto(False, icon)
+                except tk.TclError:
+                    print(f"图标文件加载失败，尝试路径: {icon_path} 或 data/zhou.png")
+
             window_width = 335
             window_height = 200
-            center_window(alert_window, window_width, window_height)
+            center_window(alert_window, window_width, window_height, icon_path=icon_path)
             if command == None:
                 command = "发起获得远程使用命令授权请求"
             label_info = tk.Label(alert_window, text=f"设备型号: {model_id}\n设备ID: {device_id}\n请求命令: {command}",
@@ -729,16 +740,25 @@ class Taskbar():
         alert_window = tk.Toplevel(root)
         alert_window.title("陌生设备发起请求")
         alert_window.attributes("-topmost", True)
-        # 设置窗口图标
+        # 使用 server_lujin_taskbar 下的 data/zhou.png（回退到模块 data/zhou.png）
+        server_path = globals().get('server_lujin_taskbar')
+        if server_path:
+            icon_path = os.path.join(server_path, "data", "zhou.png")
+        else:
+            icon_path = os.path.join(os.path.dirname(__file__), "data", "zhou.png")
         try:
-            icon = tk.PhotoImage(file="data/zhou.png")
+            icon = tk.PhotoImage(file=icon_path)
             alert_window.iconphoto(False, icon)
-        except tk.TclError:
-            print("图标文件加载失败，确保路径正确且文件存在。")
-            
+        except Exception:
+            try:
+                icon = tk.PhotoImage(file="data/zhou.png")
+                alert_window.iconphoto(False, icon)
+            except tk.TclError:
+                print(f"图标文件加载失败，尝试路径: {icon_path} 或 data/zhou.png")
+
         window_width = 335
         window_height = 200
-        center_window(alert_window, window_width, window_height)
+        center_window(alert_window, window_width, window_height, icon_path=icon_path)
         if command == None:
             command = "发起获得远程使用命令授权请求"
         label_info = tk.Label(alert_window, text=f"设备型号: {model_id}\n设备ID: {device_id}\n请求命令: {command}",
