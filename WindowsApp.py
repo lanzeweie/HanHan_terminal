@@ -122,7 +122,7 @@ class WindowsAppDetector:
     def adapt_open_directory_function(self, original_directory):
         """
         适配打开目录功能
-        对于WindowsApp应用，将目录路径修改为Documents+"HanHan_ZDserver"目录
+        对于WindowsApp应用，将目录路径修改为Documents+"HanHan_ZDserver"目录，并进入 data 子目录
 
         Args:
             original_directory (str): 原始要打开的目录路径
@@ -131,7 +131,8 @@ class WindowsAppDetector:
             str: 适配后的目录路径
         """
         if self.is_windows_store_app():
-            documents_dir = self.get_safe_directory_path() + os.sep + "HanHan_ZDserver"
+            # 重定向到 Documents\HanHan_ZDserver\data
+            documents_dir = os.path.join(self.get_safe_directory_path(), "HanHan_ZDserver", "data")
             print(f"Windows应用：将打开目录从 {original_directory} 重定向到 {documents_dir}")
             return documents_dir
         return original_directory

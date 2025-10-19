@@ -1,4 +1,6 @@
 import json
+import os
+import sys
 import tkinter as tk
 import webbrowser
 from itertools import zip_longest
@@ -23,12 +25,24 @@ class UpdateWindow:
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
         self.root.resizable(True, True)
         
-        # 设置窗口图标
+        # 设置窗口图标（从模块目录或打包时的 _MEIPASS 中寻找 data/zhou.png）
         try:
-            icon = tk.PhotoImage(file="data/zhou.png")
-            self.root.iconphoto(False, icon)
-        except tk.TclError:
-            print("图标文件加载失败，确保路径正确且文件存在。")
+            # 如果是打包后的环境（如 PyInstaller），资源可能在 _MEIPASS
+            base_dir = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+            icon_path = os.path.join(base_dir, "data", "zhou.png")
+            # 优先使用 PIL 加载，回退到 tk.PhotoImage
+            try:
+                icon_image = Image.open(icon_path)
+                icon = ImageTk.PhotoImage(icon_image)
+                self.root.iconphoto(False, icon)
+            except Exception:
+                try:
+                    icon = tk.PhotoImage(file=icon_path)
+                    self.root.iconphoto(False, icon)
+                except tk.TclError:
+                    print(f"图标文件加载失败，路径: {icon_path}，确保路径正确且文件存在。")
+        except Exception as e:
+            print(f"设置窗口图标时出错: {e}")
         
         # 版本信息框架
         version_frame = tk.Frame(self.root)

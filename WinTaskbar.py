@@ -433,7 +433,9 @@ class Taskbar():
             window = tk.Tk()
             window.title("修改设备名称")
             window_width, window_height = 320, 180
-            center_window(window, window_width, window_height)
+            # 使用 server_lujin 下的 data\zhou.png 作为窗口图标
+            icon_path = os.path.join(server_lujin, "data", "zhou.png")
+            center_window(window, window_width, window_height, icon_path=icon_path)
             
             # 创建一个主框架来容纳所有控件
             main_frame = tk.Frame(window, padx=20, pady=20)
@@ -447,7 +449,8 @@ class Taskbar():
             entry_frame = tk.Frame(main_frame)
             entry_frame.pack(fill=tk.X, pady=5)
             
-            entry = tk.Entry(entry_frame, font=("Helvetica", 12), bd=2, relief=tk.GROOVE)
+            # 使用微软雅黑字体
+            entry = tk.Entry(entry_frame, font=("Microsoft YaHei", 12), bd=2, relief=tk.GROOVE)
             entry.pack(fill=tk.X, ipady=5)
             entry.focus_set()
             
