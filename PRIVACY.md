@@ -40,7 +40,7 @@ Catime only accesses the internet in the following circumstances:
 
 * **Update Checking**
   When you manually check for updates or enable the automatic update feature, the program connects to the GitHub API:
-  `https://api.github.com/repos/vladelaina/Catime/releases/latest`
+  `https://api.github.com/repos/lanzeweie/HanHan_terminal/releases/latest`
   It only sends basic HTTP requests and the user agent string `"Catime Update Checker"`, **without any personal data**.
 
 ## Data Protection and Deletion
